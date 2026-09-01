@@ -1,0 +1,2780 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>مسالك · Masalek</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#060806;
+  --surface:#0d1210;
+  --surface-2:#141c17;
+  --line:#1e2b23;
+  --line-soft:#16201a;
+  --green:#35f09a;
+  --green-dim:#1d8a5b;
+  --green-deep:#07361f;
+  --sand:#c9c4b4;
+  --warn:#e0a45c;
+  --muted:#6e7a73;
+  --sans:"IBM Plex Sans Arabic",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --sheet-peek:184px;
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{
+  background:var(--ink);color:var(--sand);
+  font-family:var(--sans);font-weight:400;overflow:hidden
+}
+button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer}
+input,textarea{font-family:inherit}
+
+/* ---------- map ---------- */
+#map{position:fixed;inset:0;background:var(--ink);z-index:0}
+.leaflet-container{background:#070a08;font-family:var(--sans)}
+/* tiles arrive light — invert and cool them into the theme */
+.leaflet-tile{
+  filter:invert(1) hue-rotate(180deg) brightness(.66) contrast(1.12) saturate(.28)
+}
+/* Esri fallback is already dark, so no inversion there */
+body.darkbase .leaflet-tile{filter:brightness(.84) saturate(.5) hue-rotate(-10deg)}
+.leaflet-tile-pane::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(120% 90% at 50% 45%,rgba(6,20,13,.18),rgba(4,8,6,.5));
+  mix-blend-mode:multiply
+}
+.leaflet-control-attribution{
+  background:rgba(6,8,6,.72)!important;color:var(--muted)!important;
+  font-family:var(--mono);font-size:9px!important
+}
+.leaflet-control-attribution a{color:var(--green-dim)!important}
+.leaflet-control-zoom{display:none}
+
+.pin{position:relative;width:26px;height:26px}
+.pin i{position:absolute;inset:7px;border-radius:50%;display:block;
+  background:var(--green);box-shadow:0 0 0 2px var(--ink),0 0 14px rgba(53,240,154,.55)}
+.pin b{position:absolute;inset:0;border-radius:50%;border:1px solid rgba(53,240,154,.35)}
+.pin.dim i{background:transparent;border:1.5px solid var(--green-dim);
+  box-shadow:0 0 0 2px rgba(6,8,6,.85)}
+.pin.dim b{display:none}
+.card.wiki .card-body h3{color:#cdd6d1;font-weight:500}
+.wikipill{font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;color:var(--muted);
+  border:1px solid var(--line);border-radius:5px;padding:2px 5px;margin-inline-start:6px;
+  vertical-align:middle;text-transform:uppercase}
+.zoomhint{padding:26px 20px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.8}
+.pin.is-active i{background:#fff;box-shadow:0 0 0 2px var(--ink),0 0 20px rgba(255,255,255,.6)}
+
+.me{position:relative;width:34px;height:34px}
+.me i{position:absolute;inset:12px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 0 3px var(--ink);display:block}
+.me b{position:absolute;inset:0;border-radius:50%;background:rgba(53,240,154,.16);
+  animation:ping 2.6s ease-out infinite}
+@keyframes ping{0%{transform:scale(.35);opacity:.9}100%{transform:scale(1);opacity:0}}
+
+/* ---------- HUD ---------- */
+.hud{
+  position:fixed;top:0;left:0;right:0;z-index:600;
+  padding:calc(10px + env(safe-area-inset-top)) 14px 12px;
+  background:linear-gradient(180deg,rgba(6,8,6,.94) 12%,rgba(6,8,6,.72) 62%,transparent);
+  pointer-events:none;display:flex;align-items:flex-start;justify-content:space-between;gap:12px
+}
+.brand{display:flex;align-items:baseline;gap:8px}
+.brand h1{margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em;color:#eef3ef}
+.brand span{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;
+  color:var(--green-dim);text-transform:uppercase}
+
+.hud-end{display:flex;flex-direction:column;align-items:flex-end;gap:7px;pointer-events:auto}
+[dir=ltr] .hud-end{align-items:flex-end}
+.signal{font-family:var(--mono);font-size:10px;line-height:1.65;
+  color:var(--muted);direction:ltr;white-space:nowrap;text-align:right}
+.signal .lock{color:var(--green)}
+.signal .lock.off{color:var(--muted)}
+
+.langs{display:flex;align-items:center;direction:ltr;
+  border:1px solid var(--line);border-radius:9px;overflow:hidden;
+  background:rgba(9,13,11,.8);backdrop-filter:blur(8px)}
+.langs button{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;
+  padding:5px 8px;color:var(--muted);transition:color .16s ease,background .16s ease
+}
+.langs button + button{border-left:1px solid var(--line)}
+.langs button.on{color:var(--green);background:rgba(53,240,154,.09)}
+
+/* ---------- controls ---------- */
+.locate{
+  position:fixed;z-index:610;inset-inline-end:14px;
+  bottom:calc(var(--sheet-peek) + 18px + env(safe-area-inset-bottom));
+  width:46px;height:46px;border-radius:15px;
+  background:rgba(13,18,16,.9);border:1px solid var(--line);backdrop-filter:blur(10px);
+  display:grid;place-items:center;transition:transform .18s ease,border-color .18s ease
+}
+.locate:active{transform:scale(.93)}
+.locate.on{border-color:var(--green-dim)}
+.locate svg{width:19px;height:19px;stroke:var(--green);fill:none;stroke-width:1.6}
+
+/* ---------- sheet ---------- */
+.sheet{
+  position:fixed;z-index:620;left:0;right:0;bottom:0;
+  height:82vh;max-height:640px;
+  background:linear-gradient(180deg,var(--surface) 0%,#090d0b 100%);
+  border-top:1px solid var(--line);border-radius:22px 22px 0 0;
+  transform:translateY(calc(100% - var(--sheet-peek)));
+  transition:transform .34s cubic-bezier(.22,.9,.3,1);
+  display:flex;flex-direction:column;box-shadow:0 -18px 50px rgba(0,0,0,.6)
+}
+.sheet.open{transform:translateY(0)}
+.sheet.dragging{transition:none}
+.grip{padding:10px 0 4px;display:grid;place-items:center;cursor:grab;touch-action:none;flex:none}
+.grip span{width:38px;height:3px;border-radius:2px;background:var(--line);display:block}
+
+.sheet-head{flex:none;padding:4px 18px 12px;display:flex;align-items:baseline;
+  justify-content:space-between;gap:10px;border-bottom:1px solid var(--line-soft)}
+.sheet-head h2{margin:0;font-size:14px;font-weight:600;color:#e6ece8;letter-spacing:-.01em;flex:1}
+.sheet-head em{font-style:normal;font-family:var(--mono);font-size:10px;
+  color:var(--muted);letter-spacing:.06em}
+.toggle{flex:none;width:28px;height:28px;border-radius:9px;background:var(--surface-2);
+  display:grid;place-items:center;transition:background .16s ease}
+.toggle:active{background:var(--line)}
+.toggle svg{width:13px;height:13px;stroke:var(--muted);stroke-width:2.2;fill:none;
+  transition:transform .3s cubic-bezier(.22,.9,.3,1)}
+.sheet.collapsed .toggle svg{transform:rotate(180deg)}
+
+.search{flex:none;display:flex;align-items:center;gap:9px;padding:8px 16px;
+  border-bottom:1px solid var(--line-soft)}
+.search > svg{flex:none;width:15px;height:15px;stroke:var(--muted);fill:none;stroke-width:1.8}
+.search input{flex:1;min-width:0;background:transparent;border:0;outline:none;
+  color:var(--sand);font-size:13.5px;padding:7px 0}
+.search input::placeholder{color:#4b544e}
+.search .clear{flex:none;width:22px;height:22px;border-radius:50%;background:var(--surface-2);
+  display:none;place-items:center}
+.search .clear.on{display:grid}
+.search .clear svg{width:9px;height:9px;stroke:var(--muted);stroke-width:2.6;fill:none}
+
+.list{flex:1;overflow-y:auto;overscroll-behavior:contain;
+  padding:6px 12px calc(96px + env(safe-area-inset-bottom))}
+.empty{padding:34px 20px;text-align:center;color:var(--muted);font-size:13px;line-height:1.9}
+.empty strong{display:block;color:var(--sand);font-weight:500;font-size:14px;margin-bottom:6px}
+
+.card{width:100%;display:flex;gap:12px;text-align:start;padding:12px 8px;
+  border-bottom:1px solid var(--line-soft);transition:background .15s ease}
+.card:active{background:var(--surface-2)}
+.card:last-child{border-bottom:0}
+.thumb{flex:none;width:88px;height:88px;border-radius:16px;overflow:hidden;
+  background:var(--green-deep);position:relative}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb svg{width:100%;height:100%;display:block}
+.card-body{flex:1;min-width:0;padding-top:2px}
+.card-body h3{margin:0 0 3px;font-size:14.5px;font-weight:600;color:#e9efeb;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
+.card-body p{margin:0;font-size:12.5px;line-height:1.6;color:var(--muted);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.meta{flex:none;display:flex;flex-direction:column;align-items:center;gap:5px;
+  padding-top:6px;min-width:46px}
+.meta .dist{font-family:var(--mono);font-size:10.5px;color:var(--green);letter-spacing:.02em}
+.bearing{width:16px;height:16px;stroke:var(--green-dim);fill:none;stroke-width:1.7;
+  transition:transform .5s ease}
+
+/* ---------- add ---------- */
+.add{
+  position:fixed;z-index:640;bottom:calc(20px + env(safe-area-inset-bottom));
+  left:50%;transform:translateX(-50%);
+  padding:13px 22px;border-radius:999px;background:var(--green);color:#04140c;
+  font-size:13.5px;font-weight:700;letter-spacing:-.01em;
+  box-shadow:0 8px 26px rgba(53,240,154,.28);
+  display:flex;align-items:center;gap:7px;transition:transform .18s ease,opacity .18s ease
+}
+.add:active{transform:translateX(-50%) scale(.95)}
+.add.hide{opacity:0;pointer-events:none;transform:translateX(-50%) translateY(14px)}
+.add svg{width:15px;height:15px;stroke:#04140c;stroke-width:2.4;fill:none}
+
+/* ---------- pick mode ---------- */
+.crosshair{position:fixed;z-index:615;top:50%;left:50%;transform:translate(-50%,-50%);
+  pointer-events:none;width:70px;height:70px;display:none;place-items:center}
+.crosshair.on{display:grid}
+.crosshair::before,.crosshair::after{content:"";position:absolute;background:var(--green);opacity:.85}
+.crosshair::before{width:1px;height:70px}
+.crosshair::after{width:70px;height:1px}
+.crosshair i{width:26px;height:26px;border:1.5px solid var(--green);border-radius:50%;
+  background:rgba(53,240,154,.1);position:relative;z-index:2}
+.pickbar{position:fixed;z-index:650;left:14px;right:14px;
+  bottom:calc(20px + env(safe-area-inset-bottom));
+  background:rgba(13,18,16,.95);border:1px solid var(--line);backdrop-filter:blur(14px);
+  border-radius:18px;padding:14px 16px;display:none;align-items:center;gap:12px}
+.pickbar.on{display:flex}
+.pickbar p{margin:0;flex:1;font-size:12.5px;line-height:1.6;color:var(--muted)}
+.pickbar p b{display:block;color:var(--sand);font-weight:500;font-size:13.5px;margin-bottom:2px}
+.pickbar button{padding:12px 20px;border-radius:13px;background:var(--green);
+  color:#04140c;font-size:13px;font-weight:700;white-space:nowrap}
+
+/* ---------- modals ---------- */
+.scrim{position:fixed;inset:0;z-index:700;background:rgba(3,5,4,.72);backdrop-filter:blur(3px);
+  opacity:0;pointer-events:none;transition:opacity .26s ease}
+.scrim.on{opacity:1;pointer-events:auto}
+
+.panel{position:fixed;z-index:710;left:0;right:0;bottom:0;max-height:92vh;
+  display:flex;flex-direction:column;background:var(--surface);
+  border-top:1px solid var(--line);border-radius:22px 22px 0 0;
+  transform:translateY(101%);transition:transform .34s cubic-bezier(.22,.9,.3,1)}
+.panel.on{transform:translateY(0)}
+.panel-head{flex:none;display:flex;align-items:center;justify-content:space-between;
+  gap:12px;padding:18px 18px 12px;border-bottom:1px solid var(--line-soft)}
+.panel-head h2{margin:0;font-size:17px;font-weight:600;color:#eef3ef;letter-spacing:-.015em}
+.close{flex:none;width:32px;height:32px;border-radius:10px;background:var(--surface-2);
+  display:grid;place-items:center}
+.close svg{width:14px;height:14px;stroke:var(--muted);stroke-width:2;fill:none}
+.panel-body{flex:1;overflow-y:auto;padding:16px 18px calc(24px + env(safe-area-inset-bottom))}
+
+.gallery{display:flex;gap:9px;overflow-x:auto;padding-bottom:10px;margin-bottom:14px}
+.gallery{scroll-snap-type:x mandatory}
+.gallery img,.gallery .ph{flex:none;width:270px;height:194px;border-radius:16px;
+  object-fit:cover;background:var(--green-deep);scroll-snap-align:start;cursor:zoom-in}
+.gallery img{transition:opacity .2s ease}
+.gallery img:active{opacity:.85}
+
+.lightbox{position:fixed;inset:0;z-index:950;background:rgba(3,5,4,.95);
+  display:none;place-items:center;padding:20px;cursor:zoom-out}
+.lightbox.on{display:grid}
+.lightbox img{max-width:94vw;max-height:88vh;border-radius:14px;object-fit:contain}
+.lb-nav{position:absolute;top:50%;transform:translateY(-50%);
+  width:54px;height:54px;border-radius:50%;cursor:pointer;
+  background:rgba(13,18,16,.88);border:1px solid var(--line);
+  backdrop-filter:blur(8px);display:grid;place-items:center;
+  transition:background .16s ease,border-color .16s ease}
+.lb-nav:hover{border-color:var(--green-dim);background:rgba(20,28,23,.95)}
+.lb-nav svg{width:20px;height:20px;stroke:var(--green);fill:none;stroke-width:2.2}
+.lb-nav.prev{left:18px}
+.lb-nav.next{right:18px}
+.lb-nav.off{display:none}
+@media(max-width:600px){
+  .lb-nav{width:44px;height:44px}
+  .lb-nav.prev{left:8px}
+  .lb-nav.next{right:8px}
+}
+
+.lightbox .count{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+  background:var(--surface);border:1px solid var(--line);padding:6px 14px;border-radius:999px}
+.tagline{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--green-dim);margin:0 0 14px}
+.story{font-size:14.5px;line-height:2.05;color:var(--sand);margin:0 0 16px;white-space:pre-wrap}
+.origin{display:flex;align-items:center;gap:8px;margin:0 0 20px;padding:10px 13px;
+  border:1px solid var(--line);border-radius:12px;
+  font-size:11.5px;line-height:1.6;color:var(--muted)}
+.origin::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:var(--green-dim)}
+.origin.hide{display:none}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line-soft);
+  border-radius:14px;overflow:hidden}
+.facts div{background:var(--surface-2);padding:12px 14px}
+.facts dt{font-size:10px;color:var(--muted);margin:0 0 4px;letter-spacing:.04em}
+.facts dd{margin:0;font-family:var(--mono);font-size:12.5px;color:var(--green);text-align:start}
+.facts dd.txt{font-family:var(--sans);color:var(--sand);font-size:13px}
+
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:7px}
+.field input,.field textarea{width:100%;background:#080c0a;border:1px solid var(--line);
+  border-radius:13px;padding:12px 14px;color:var(--sand);font-size:14px;
+  outline:none;transition:border-color .18s ease}
+.field textarea{min-height:132px;resize:vertical;line-height:1.85}
+.field input:focus,.field textarea:focus{border-color:var(--green-dim)}
+.field input::placeholder,.field textarea::placeholder{color:#4b544e}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+
+.drop{border:1px dashed var(--line);border-radius:14px;padding:18px;text-align:center;
+  color:var(--muted);font-size:12.5px;line-height:1.7;transition:border-color .18s ease}
+.drop:active{border-color:var(--green-dim)}
+.drop b{display:block;color:var(--sand);font-weight:500;font-size:13.5px;margin-bottom:3px}
+.shots{display:flex;gap:8px;flex-wrap:wrap;margin-top:11px}
+.shot{position:relative;width:74px;height:74px;border-radius:12px;overflow:hidden}
+.shot img{width:100%;height:100%;object-fit:cover;display:block}
+.shot button{position:absolute;top:4px;inset-inline-end:4px;width:20px;height:20px;
+  border-radius:50%;background:rgba(3,5,4,.82);display:grid;place-items:center}
+.shot button svg{width:9px;height:9px;stroke:#fff;stroke-width:2.6;fill:none}
+
+.locpick{display:flex;align-items:center;gap:11px;background:var(--surface-2);
+  border-radius:14px;padding:13px 15px}
+.locpick .dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--green)}
+.locpick p{margin:0;flex:1;font-size:12.5px;color:var(--muted)}
+.locpick p b{display:block;font-family:var(--mono);font-size:11.5px;color:var(--sand);
+  margin-top:3px;text-align:start}
+.locpick button{font-size:12px;color:var(--green);font-weight:600;white-space:nowrap}
+
+.misshint{display:none;font-size:11.5px;line-height:1.7;color:var(--warn);
+  margin:0 0 11px;text-align:center}
+.misshint.on{display:block}
+.misshint b{color:var(--sand);font-weight:600}
+.misshint button{display:inline-block;margin-top:8px;padding:7px 14px;border-radius:999px;
+  border:1px solid var(--warn);color:var(--warn);font-size:11.5px;font-weight:600}
+.locpick.needed{border:1px solid var(--warn)}
+.locpick.needed .dot{background:var(--warn)}
+
+.submit{width:100%;padding:15px;border-radius:15px;background:var(--green);color:#04140c;
+  font-size:14.5px;font-weight:700;letter-spacing:-.01em;margin-top:6px;transition:opacity .18s ease}
+.submit:disabled{opacity:.35}
+.hint{font-size:11.5px;color:var(--muted);text-align:center;margin:12px 0 0;line-height:1.7}
+
+.toast{position:fixed;z-index:900;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));
+  transform:translate(-50%,16px);opacity:0;pointer-events:none;
+  background:var(--surface-2);border:1px solid var(--line);padding:11px 18px;
+  border-radius:999px;font-size:12.5px;color:var(--sand);
+  transition:opacity .24s ease,transform .24s ease;white-space:nowrap}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+@media(min-width:860px){
+  .sheet{right:auto;left:16px;top:16px;bottom:16px;width:392px;height:auto;max-height:none;
+    border-radius:20px;border:1px solid var(--line);transform:none}
+  [dir=rtl] .sheet{left:auto;right:16px}
+  .sheet.collapsed{display:none}
+  .listbtn.on{display:grid}
+  .grip{display:none}
+  .sheet-head{padding-top:18px}
+  .locate{inset-inline-end:16px;bottom:auto;top:110px}
+  #btnSetPos{inset-inline-end:16px;bottom:auto!important;top:166px}
+  .adminbtn{inset-inline-end:16px;bottom:auto;top:222px}
+  .add{left:auto;inset-inline-end:16px;bottom:22px;transform:none}
+  .add:active{transform:scale(.95)}
+  .add.hide{transform:translateY(14px)}
+  .panel{left:auto;inset-inline-end:16px;bottom:16px;top:16px;width:452px;
+    max-height:none;border-radius:20px;border:1px solid var(--line);
+    transform:translateY(calc(100% + 32px))}
+  .panel.on{transform:translateY(0)}
+  .pickbar{left:auto;inset-inline-end:16px;width:452px}
+}
+
+@media(prefers-reduced-motion:reduce){*{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+
+/* ---------- status / badges ---------- */
+.badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:17px;height:17px;padding:0 5px;border-radius:999px;
+  background:var(--green);color:#04140c;font-family:var(--mono);
+  font-size:9.5px;font-weight:500;line-height:1
+}
+.badge.zero{background:var(--line);color:var(--muted)}
+
+.listbtn{
+  position:fixed;z-index:612;top:calc(72px + env(safe-area-inset-top));
+  inset-inline-start:16px;width:46px;height:46px;border-radius:15px;
+  background:rgba(13,18,16,.9);border:1px solid var(--line);backdrop-filter:blur(10px);
+  display:none;place-items:center;transition:transform .18s ease,border-color .18s ease
+}
+.listbtn:active{transform:scale(.93)}
+.listbtn svg{width:19px;height:19px;stroke:var(--green);fill:none;stroke-width:1.7}
+.listbtn .badge{position:absolute;top:-6px;inset-inline-start:-6px;
+  background:var(--surface-2);color:var(--sand);border:1px solid var(--line)}
+
+.adminbtn{
+  position:fixed;z-index:611;inset-inline-end:14px;
+  bottom:calc(var(--sheet-peek) + 74px + env(safe-area-inset-bottom));
+  width:46px;height:46px;border-radius:15px;
+  background:rgba(13,18,16,.9);border:1px solid var(--line);backdrop-filter:blur(10px);
+  display:none;place-items:center;transition:transform .18s ease
+}
+.adminbtn.on{display:grid}
+.adminbtn:active{transform:scale(.93)}
+.adminbtn svg{width:19px;height:19px;stroke:var(--green);fill:none;stroke-width:1.6}
+.adminbtn .badge{position:absolute;top:-6px;inset-inline-end:-6px}
+
+/* ---------- tabs ---------- */
+.tabs{flex:none;display:flex;gap:6px;padding:12px 18px 0}
+.tabs button{
+  flex:1;padding:9px 8px;border-radius:11px;background:var(--surface-2);
+  font-size:12.5px;font-weight:600;color:var(--muted);
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  transition:color .16s ease,background .16s ease
+}
+.tabs button.on{color:#04140c;background:var(--green)}
+.tabs button.on .badge{background:#04140c;color:var(--green)}
+
+.pane{display:none}
+.pane.on{display:block}
+
+/* ---------- review card ---------- */
+.review{border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+.review-top{display:flex;gap:11px;margin-bottom:10px}
+.review-top .thumb{width:54px;height:54px;border-radius:12px}
+.review-top div{flex:1;min-width:0}
+.review-top h3{margin:0 0 3px;font-size:14.5px;font-weight:600;color:#e9efeb}
+.review-top p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.5}
+.review-story{
+  font-size:12.5px;line-height:1.85;color:var(--sand);margin:0 0 12px;
+  max-height:88px;overflow:hidden;position:relative
+}
+.review-meta{font-family:var(--mono);font-size:10px;color:var(--muted);margin:0 0 12px}
+.actions{display:flex;gap:8px}
+.actions button{flex:1;padding:11px;border-radius:12px;font-size:12.5px;font-weight:700}
+.ok{background:var(--green);color:#04140c}
+.no{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+
+/* ---------- report ---------- */
+.reportbtn{
+  width:100%;margin-top:18px;padding:12px;border-radius:13px;
+  border:1px solid var(--line);background:transparent;
+  font-size:12.5px;font-weight:600;color:var(--muted);
+  display:flex;align-items:center;justify-content:center;gap:8px
+}
+.reportbtn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8}
+.reportbtn:active{border-color:var(--green-dim);color:var(--sand)}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{
+  padding:9px 13px;border-radius:999px;border:1px solid var(--line);
+  font-size:12.5px;color:var(--muted);transition:all .16s ease
+}
+.chips button.on{border-color:var(--green);color:var(--green);background:rgba(53,240,154,.08)}
+
+.thread{display:flex;flex-direction:column;gap:9px;margin-bottom:16px}
+.bub{max-width:82%;padding:11px 14px;border-radius:15px;font-size:13px;line-height:1.7}
+.bub.user{align-self:flex-start;background:var(--surface-2);border-end-start-radius:5px}
+.bub.admin{align-self:flex-end;background:var(--green-deep);
+  border:1px solid var(--green-dim);border-end-end-radius:5px}
+.bub time{display:block;font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:5px}
+
+.composer-row{display:flex;gap:8px;align-items:flex-end}
+.composer-row input{flex:1}
+.composer-row button{
+  flex:none;width:44px;height:44px;border-radius:13px;background:var(--green);
+  display:grid;place-items:center
+}
+.composer-row button svg{width:17px;height:17px;stroke:#04140c;fill:none;stroke-width:2}
+[dir=rtl] .composer-row button svg{transform:scaleX(-1)}
+.composer-row button:disabled{opacity:.35}
+
+.rcard{
+  width:100%;text-align:start;border:1px solid var(--line);border-radius:15px;
+  padding:13px 14px;margin-bottom:10px;display:block;transition:border-color .16s ease
+}
+.rcard:active{border-color:var(--green-dim)}
+.rcard h3{margin:0 0 4px;font-size:13.5px;font-weight:600;color:#e9efeb}
+.rcard p{margin:0 0 7px;font-size:12px;color:var(--muted);line-height:1.6;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.rcard .tagrow{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:9.5px}
+.pill{padding:3px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
+.pill.open{background:rgba(53,240,154,.11);color:var(--green)}
+
+.sect{border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+.sect h4{margin:0 0 4px;font-size:12.5px;font-weight:600;color:#e6ece8}
+.sect .sub{font-size:11px;color:var(--muted);margin:0 0 12px;line-height:1.65}
+.strrow{margin-bottom:9px}
+.strrow label{display:block;font-family:var(--mono);font-size:9px;color:var(--muted);
+  margin-bottom:4px;letter-spacing:.05em}
+.strrow input,.strrow textarea{width:100%;background:#080c0a;border:1px solid var(--line);
+  border-radius:10px;padding:9px 11px;color:var(--sand);font-size:12.5px;
+  outline:none;font-family:inherit;line-height:1.6}
+.strrow textarea{resize:vertical;min-height:56px}
+.strrow input:focus,.strrow textarea:focus{border-color:var(--green-dim)}
+.strrow.dirty input,.strrow.dirty textarea{border-color:var(--green-dim)}
+.minibtn{padding:10px 14px;border-radius:11px;background:var(--surface-2);
+  border:1px solid var(--line);font-size:12px;font-weight:600;color:var(--green)}
+.sect .row{margin-bottom:0}
+
+.gate{padding:34px 20px;text-align:center}
+.gate h3{margin:0 0 8px;font-size:16px;font-weight:600;color:#e9efeb}
+.gate p{margin:0 0 20px;font-size:12.5px;color:var(--muted);line-height:1.8}
+.gate input{text-align:center;font-family:var(--mono);letter-spacing:.3em}
+
+:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
+</style>
+
+<div id="map"></div>
+
+<header class="hud">
+  <div class="brand">
+    <h1 id="brandName">مسالك</h1>
+    <span id="brandSub">Masalek</span>
+  </div>
+  <div class="hud-end">
+    <div class="signal">
+      <div><span class="lock off" id="lock">○</span> <span id="acc">NO SIGNAL</span></div>
+      <div id="coords">--.---- / --.----</div>
+    </div>
+    <div class="langs" id="langs">
+      <button data-lang="ar">AR</button>
+      <button data-lang="en">EN</button>
+      <button data-lang="it">IT</button>
+      <button data-lang="fr">FR</button>
+    </div>
+  </div>
+</header>
+
+<button class="locate" id="btnLocate">
+  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M12 1v3M12 20v3M23 12h-3M4 12H1"/></svg>
+</button>
+
+<button class="locate" id="btnSetPos" aria-label="set position"
+        style="bottom:calc(var(--sheet-peek) + 74px + env(safe-area-inset-bottom))">
+  <svg viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.4"/></svg>
+</button>
+
+<button class="listbtn" id="btnOpenList" aria-label="list">
+  <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01" stroke-width="2.4" stroke-linecap="round"/></svg>
+  <span class="badge" id="listBtnCount">0</span>
+</button>
+
+<button class="adminbtn" id="btnAdmin">
+  <svg viewBox="0 0 24 24"><path d="M12 3l8 3.5v5c0 4.6-3.2 8.5-8 9.5-4.8-1-8-4.9-8-9.5v-5z"/><path d="M9 12l2 2 4-4"/></svg>
+  <span class="badge zero" id="adminBadge">0</span>
+</button>
+
+<div class="crosshair" id="crosshair"><i></i></div>
+
+<div class="pickbar" id="pickbar">
+  <p><b data-i18n="pickTitle"></b><span data-i18n="pickBody"></span></p>
+  <button id="btnConfirmPick" data-i18n="confirm"></button>
+</div>
+
+<section class="sheet" id="sheet">
+  <div class="grip" id="grip"><span></span></div>
+  <div class="sheet-head">
+    <h2 id="listTitle"></h2>
+    <em id="listCount">00</em>
+    <button class="toggle" id="btnToggle" aria-label="open/close">
+      <svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>
+    </button>
+  </div>
+  <div class="search">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4.2-4.2"/></svg>
+    <input id="q" data-i18n-ph="searchPh" autocomplete="off">
+    <button class="clear" id="qClear"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="list" id="list"></div>
+</section>
+
+<button class="add" id="btnAdd">
+  <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+  <span data-i18n="addBtn"></span>
+</button>
+
+<div class="scrim" id="scrim"></div>
+
+<aside class="panel" id="detail">
+  <div class="panel-head">
+    <h2 id="dTitle"></h2>
+    <button class="close" id="btnEditPlace" style="display:none">
+      <svg viewBox="0 0 24 24" style="stroke:var(--green)"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 00-3-3L5 17v3z"/><path d="M13.5 6.5l4 4"/></svg>
+    </button>
+    <button class="close" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="panel-body">
+    <div class="gallery" id="dGallery"></div>
+    <p class="tagline" id="dCredit" style="display:none;margin-top:-6px">photo · Wikipedia</p>
+    <p class="tagline" id="dTag"></p>
+    <p class="story" id="dStory"></p>
+    <p class="origin hide" id="dOrigin"></p>
+    <dl class="facts">
+      <div><dt data-i18n="factCountry"></dt><dd class="txt" id="dCountry"></dd></div>
+      <div><dt data-i18n="factAuthor"></dt><dd class="txt" id="dAuthor"></dd></div>
+      <div><dt data-i18n="factCoords"></dt><dd><bdi id="dCoords"></bdi></dd></div>
+      <div><dt data-i18n="factDist"></dt><dd><bdi id="dDist"></bdi></dd></div>
+    </dl>
+    <button class="reportbtn" id="btnReport">
+      <svg viewBox="0 0 24 24"><path d="M12 8v5M12 17h.01"/><path d="M10.3 4.3L2.9 17.5A1.9 1.9 0 004.6 20.4h14.8a1.9 1.9 0 001.7-2.9L13.7 4.3a1.9 1.9 0 00-3.4 0z"/></svg>
+      <span data-i18n="reportBtn"></span>
+    </button>
+  </div>
+</aside>
+
+<aside class="panel" id="report">
+  <div class="panel-head">
+    <h2 id="reportHead"></h2>
+    <button class="close" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="panel-body">
+    <div id="reportNew">
+      <div class="field">
+        <label data-i18n="reportReason"></label>
+        <div class="chips" id="reasons"></div>
+      </div>
+      <div class="field">
+        <label data-i18n="reportMsg"></label>
+        <textarea id="rMsg" data-i18n-ph="reportMsgPh" style="min-height:104px"></textarea>
+      </div>
+      <button class="submit" id="btnSendReport" disabled data-i18n="sendReport"></button>
+    </div>
+    <div id="reportThread" style="display:none">
+      <p class="tagline" id="rThreadTag"></p>
+      <div class="thread" id="rThread"></div>
+      <div class="composer-row">
+        <input id="rReply" data-i18n-ph="replyPh">
+        <button id="btnReply" disabled><svg viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></svg></button>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<aside class="panel" id="admin">
+  <div class="panel-head">
+    <h2 data-i18n="adminTitle"></h2>
+    <button class="close" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="tabs" id="tabs">
+    <button data-tab="req" class="on"><span data-i18n="tabRequests"></span><span class="badge zero" id="badgeReq">0</span></button>
+    <button data-tab="rep"><span data-i18n="tabReports"></span><span class="badge zero" id="badgeRep">0</span></button>
+    <button data-tab="all"><span data-i18n="tabAll"></span></button>
+    <button data-tab="site"><span data-i18n="tabSite"></span></button>
+  </div>
+  <div class="panel-body">
+    <div class="pane on" id="paneReq"></div>
+    <div class="pane" id="paneRep"></div>
+    <div class="pane" id="paneAll"></div>
+    <div class="pane" id="paneSite"></div>
+  </div>
+</aside>
+
+<aside class="panel" id="gate">
+  <div class="panel-head">
+    <h2 data-i18n="gateTitle"></h2>
+    <button class="close" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="panel-body">
+    <div class="gate">
+      <h3 data-i18n="gateHead"></h3>
+      <p data-i18n="gateBody"></p>
+      <div class="field"><input id="gCode" inputmode="numeric" maxlength="8" placeholder="••••"></div>
+      <button class="submit" id="btnGate" data-i18n="gateEnter"></button>
+    </div>
+  </div>
+</aside>
+
+<aside class="panel" id="composer">
+  <div class="panel-head">
+    <h2 data-i18n="composerTitle"></h2>
+    <button class="close" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="panel-body">
+    <div class="field">
+      <label data-i18n="locLabel"></label>
+      <div class="locpick" id="locRow">
+        <span class="dot"></span>
+        <p><span id="fLocLabel"></span><b id="fLocCoords">--.---- / --.----</b></p>
+        <button id="btnPickOnMap" data-i18n="change"></button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field"><label data-i18n="fName"></label><input id="fName" data-i18n-ph="phName"></div>
+      <div class="field"><label data-i18n="fCountry"></label><input id="fCountry" data-i18n-ph="phCountry"></div>
+    </div>
+    <div class="field">
+      <label data-i18n="fTag"></label>
+      <input id="fTag" data-i18n-ph="phTag">
+    </div>
+    <div class="field">
+      <label data-i18n="fStory"></label>
+      <textarea id="fStory" data-i18n-ph="phStory"></textarea>
+    </div>
+    <div class="field">
+      <label data-i18n="fPhotos"></label>
+      <div class="drop" id="drop"><b data-i18n="dropTitle"></b><span data-i18n="dropBody"></span></div>
+      <input type="file" id="fFiles" accept="image/*" multiple hidden>
+      <div class="shots" id="shots"></div>
+    </div>
+    <div class="field"><label data-i18n="fAuthor"></label><input id="fAuthor" data-i18n-ph="phAuthor"></div>
+    <p class="tagline" id="editNote" style="display:none"></p>
+    <p class="misshint" id="saveHint"></p>
+    <button class="submit" id="btnSave" disabled data-i18n="publish"></button>
+    <button class="no" id="btnDelete" style="display:none;width:100%;padding:13px;border-radius:14px;margin-top:10px;font-size:13px;font-weight:700"></button>
+    <p class="hint" data-i18n="hint"></p>
+  </div>
+</aside>
+
+<div class="lightbox" id="lightbox">
+  <button class="lb-nav prev" id="lbPrev" aria-label="prev">
+    <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+  </button>
+  <img id="lbImg" alt="">
+  <button class="lb-nav next" id="lbNext" aria-label="next">
+    <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+  </button>
+  <span class="count" id="lbCount"></span>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+/* ============================================================
+   مسالك / Masalek — demo
+   Leaflet + OSM · geolocation · local stories · AR / EN / IT
+   ============================================================ */
+
+/* ---------- interface strings ---------- */
+const L10N = {
+  ar:{
+    dir:'rtl', label:'العربية', brand:'مسالك',
+    nearYou:'بلايص قريبة منّك', onMap:'بلايص على الخريطة',
+    emptyT:'الخريطة خاوية', emptyB:'كون أول واحد يكتب على بلادو.',
+    addBtn:'زيد بلاصتك',
+    pickTitle:'حرّك الخريطة', pickBody:'حطّ الدائرة فوق البلاصة', confirm:'أكّد',
+    composerTitle:'عرّف ببلادك',
+    locLabel:'البلاصة على الخريطة', noLoc:'ما اخترتش بلاصة',
+    yourLoc:'بلاصتك الحالية', pickedLoc:'بلاصة مختارة على الخريطة', change:'بدّل',
+    fName:'اسم البلاصة', phName:'سيدي بو سعيد',
+    fCountry:'البلاد', phCountry:'تونس',
+    fTag:'جملة تعريف قصيرة', phTag:'قرية زرقاء وبيضاء فوق البحر',
+    fStory:'احكي على بلادك',
+    phStory:'شنوّة لازم الزاير يشوف؟ وقتاش أحسن وقت يجي؟ شنوّة ياكل؟',
+    fPhotos:'تصاور', dropTitle:'زيد تصاور', dropBody:'حتى 5 تصاور من التلفون',
+    fAuthor:'اسمك', phAuthor:'أنيس من نابل',
+    publish:'انشر البلاصة',
+    hint:'هاذي نسخة تجربة — البيانات تتسجّل فالجهاز متاعك برك.',
+    factCountry:'البلاد', factAuthor:'كتبها', factCoords:'الإحداثيات', factDist:'البعد عليك',
+    anon:'مجهول', m:'م', km:'كم',
+    origin:'هالنص مكتوب بلغة أخرى وما فماش ترجمة ليه.',
+    tPublished:'تنشرت — ثابتة على الخريطة',
+    tDenied:'رفضت الإذن — بدّلو من إعدادات المتصفح',
+    tNotFound:'ما نجّمتش نلقى بلاصتك',
+    tNoGeo:'الجهاز ما يدعمش تحديد البلاصة',
+    tBadPhoto:'تصويرة ما تقراتش',
+    adminTitle:'لوحة الإدارة', tabRequests:'طلبات', tabReports:'بلاغات',
+    noRequests:'ما فماش طلبات تستنى.', noReports:'ما فماش بلاغات.',
+    approve:'اقبل', reject:'ارفض', pendingNote:'تستنى موافقة',
+    tApproved:'تقبلت — ثابتة على الخريطة', tRejected:'تنرفضت',
+    tPendingSent:'تبعثت — تستنى موافقة الإدارة',
+    reportBtn:'بلّغ على هالبلاصة', reportTitle:'بلاغ',
+    reportReason:'شنوّة المشكل؟', reportMsg:'فسّرلنا أكثر', reportMsgPh:'اكتب التفاصيل...',
+    sendReport:'ابعث البلاغ',
+    reasonWrong:'معلومة غالطة', reasonFake:'البلاصة ما موجودةش',
+    reasonOffensive:'كلام مسيء', reasonPhotos:'مشكل فالتصاور', reasonOther:'حاجة أخرى',
+    yourReport:'البلاغ متاعك', replyPh:'اكتب رسالة...',
+    tReportSent:'البلاغ تبعث للإدارة', tReplySent:'الرسالة تبعثت',
+    statusOpen:'مفتوح', statusResolved:'تسكّر', resolve:'سكّر البلاغ',
+    gateTitle:'دخول الإدارة', gateHead:'كود الإدارة',
+    gateBody:'هالصفحة للمشرفين برك. أدخل الكود باش تشوف الطلبات والبلاغات.',
+    gateEnter:'ادخل', tBadCode:'الكود غالط',
+    youTag:'إنت', adminTag:'الإدارة',
+    missing:'ينقصك:', needLoc:'بلاصة على الخريطة', needName:'اسم البلاصة',
+    needStory:'نص أطول (25 حرف على الأقل)',
+    searchPh:'لوّج على بلاصة، بلاد...', noResults:'ما لقينا حتى بلاصة.',
+    resultsFor:'نتائج البحث',
+    tabAll:'البلايص', editTitle:'تعديل البلاصة', saveChanges:'احفظ التبديل',
+    deleteBtn:'امسح البلاصة', confirmDel:'متأكد؟ انقر مرّة أخرى باش تمسح',
+    tSaved:'التبديل تسجّل', tDeleted:'البلاصة تمسحت',
+    editingIn:'إنت تبدّل النسخة بـ', noPlaces:'ما فماش بلايص.',
+    tabSite:'الموقع', siteBrand:'اسم التطبيق', siteSub:'الاسم الصغير',
+    siteMap:'المنظر الافتراضي للخريطة', useCurrentView:'استعمل المنظر الحالي',
+    siteCode:'كود الإدارة', siteTexts:'نصوص الواجهة',
+    siteTextsHint:'صلّح أي كلمة غالطة فاللغة اللي إنت فيها توّا. تتسجّل وحدها.',
+    filterPh:'لوّج فالنصوص...', resetText:'رجّع الأصلي', tSettingsSaved:'تسجّل',
+    minDistLabel:'أقل مسافة بين زوز بلايص (متر)',
+    zoomIn:'قرّب أكثر باش تطلع كل البلايص', viaWiki:'من ويكيبيديا',
+    posApprox:'البلاصة تقريبية — الجهاز عطاها بالشبكة موش بالـGPS. اضغط مطوّل على الزر باش تحطّها بيدك.',
+    setMyPos:'حط بلاصتك', setMyPosBody:'حرّك الخريطة حتى تولي الدائرة فوق بلاصتك', posManual:'بيدك',
+    baseLabel:'شكل الخريطة', baseGreen:'أخضر كحل', baseEnglish:'إنڤليزي', baseGrey:'رمادي',
+    writeAbout:'اكتب على هالبلاصة', discovered:'wiki',
+    tooClose:'فمّة بلاصة قريبة برشا:', sameName:'فمّة بلاصة بنفس الاسم:',
+    mergeHint:'زيد اللي عندك عليها بدل ما تعمل وحدة جديدة.', seeIt:'شوفها'
+  },
+  en:{
+    dir:'ltr', label:'English', brand:'Masalek',
+    nearYou:'Near you', onMap:'Places on the map',
+    emptyT:'The map is empty', emptyB:'Be the first to write about your town.',
+    addBtn:'Add your place',
+    pickTitle:'Move the map', pickBody:'Put the circle on the spot', confirm:'Confirm',
+    composerTitle:'Introduce your place',
+    locLabel:'Location on the map', noLoc:'No spot chosen',
+    yourLoc:'Your current location', pickedLoc:'Picked on the map', change:'Change',
+    fName:'Place name', phName:'Sidi Bou Said',
+    fCountry:'Country', phCountry:'Tunisia',
+    fTag:'One-line description', phTag:'A blue-and-white village above the sea',
+    fStory:'Tell us about it',
+    phStory:'What should a visitor see? When is the best time to come? What should they eat?',
+    fPhotos:'Photos', dropTitle:'Add photos', dropBody:'Up to 5 from your phone',
+    fAuthor:'Your name', phAuthor:'Anis from Nabeul',
+    publish:'Publish place',
+    hint:'This is a test build — data is stored on your device only.',
+    factCountry:'Country', factAuthor:'Written by', factCoords:'Coordinates', factDist:'Distance',
+    anon:'Anonymous', m:'m', km:'km',
+    origin:'This was written in another language and has no translation yet.',
+    tPublished:'Published — it is on the map',
+    tDenied:'Permission denied — enable it in your browser settings',
+    tNotFound:'Could not find your location',
+    tNoGeo:'This device does not support location',
+    tBadPhoto:'That photo could not be read',
+    adminTitle:'Admin', tabRequests:'Requests', tabReports:'Reports',
+    noRequests:'No requests waiting.', noReports:'No reports.',
+    approve:'Approve', reject:'Reject', pendingNote:'Awaiting approval',
+    tApproved:'Approved — now on the map', tRejected:'Rejected',
+    tPendingSent:'Sent — waiting for admin approval',
+    reportBtn:'Report this place', reportTitle:'Report',
+    reportReason:'What is wrong?', reportMsg:'Tell us more', reportMsgPh:'Write the details…',
+    sendReport:'Send report',
+    reasonWrong:'Wrong information', reasonFake:'Place does not exist',
+    reasonOffensive:'Offensive content', reasonPhotos:'Problem with the photos', reasonOther:'Something else',
+    yourReport:'Your report', replyPh:'Write a message…',
+    tReportSent:'Report sent to the admins', tReplySent:'Message sent',
+    statusOpen:'Open', statusResolved:'Resolved', resolve:'Close report',
+    gateTitle:'Admin access', gateHead:'Admin code',
+    gateBody:'This page is for moderators only. Enter the code to see requests and reports.',
+    gateEnter:'Enter', tBadCode:'Wrong code',
+    youTag:'You', adminTag:'Admin',
+    missing:'Still missing:', needLoc:'a spot on the map', needName:'the place name',
+    needStory:'a longer text (25 characters min)',
+    searchPh:'Search a place, a country…', noResults:'Nothing found.',
+    resultsFor:'Search results',
+    tabAll:'Places', editTitle:'Edit place', saveChanges:'Save changes',
+    deleteBtn:'Delete place', confirmDel:'Sure? Tap again to delete',
+    tSaved:'Changes saved', tDeleted:'Place deleted',
+    editingIn:'You are editing the version in', noPlaces:'No places.',
+    tabSite:'Site', siteBrand:'App name', siteSub:'Subtitle',
+    siteMap:'Default map view', useCurrentView:'Use current view',
+    siteCode:'Admin code', siteTexts:'Interface texts',
+    siteTextsHint:'Fix any wrong wording in the language you are viewing. Saves itself.',
+    filterPh:'Filter texts…', resetText:'Reset', tSettingsSaved:'Saved',
+    minDistLabel:'Minimum distance between two places (m)',
+    zoomIn:'Zoom in to load every town', viaWiki:'from Wikipedia',
+    posApprox:'Approximate fix — your device used the network, not GPS. Hold the button to set it by hand.',
+    setMyPos:'Set your position', setMyPosBody:'Move the map until the circle is on you', posManual:'manual',
+    baseLabel:'Map style', baseGreen:'Dark green', baseEnglish:'English labels', baseGrey:'Grey',
+    writeAbout:'Write about this place', discovered:'wiki',
+    tooClose:'There is already a place very close:', sameName:'A place with this name exists:',
+    mergeHint:'Add what you know to that one instead of creating a second entry.', seeIt:'Open it'
+  },
+  it:{
+    dir:'ltr', label:'Italiano', brand:'Masalek',
+    nearYou:'Vicino a te', onMap:'Luoghi sulla mappa',
+    emptyT:'La mappa è vuota', emptyB:'Sii il primo a raccontare il tuo paese.',
+    addBtn:'Aggiungi un luogo',
+    pickTitle:'Muovi la mappa', pickBody:'Metti il cerchio sul punto', confirm:'Conferma',
+    composerTitle:'Racconta il tuo luogo',
+    locLabel:'Posizione sulla mappa', noLoc:'Nessun punto scelto',
+    yourLoc:'La tua posizione', pickedLoc:'Scelto sulla mappa', change:'Cambia',
+    fName:'Nome del luogo', phName:'Sidi Bou Said',
+    fCountry:'Paese', phCountry:'Tunisia',
+    fTag:'Descrizione in una riga', phTag:'Un villaggio bianco e blu sul mare',
+    fStory:'Raccontalo',
+    phStory:'Cosa deve vedere chi arriva? Qual è il periodo migliore? Cosa si mangia?',
+    fPhotos:'Foto', dropTitle:'Aggiungi foto', dropBody:'Fino a 5 dal telefono',
+    fAuthor:'Il tuo nome', phAuthor:'Anis da Nabeul',
+    publish:'Pubblica il luogo',
+    hint:'Questa è una versione di prova — i dati restano solo sul tuo dispositivo.',
+    factCountry:'Paese', factAuthor:'Scritto da', factCoords:'Coordinate', factDist:'Distanza',
+    anon:'Anonimo', m:'m', km:'km',
+    origin:'Questo testo è stato scritto in un\u0027altra lingua e non ha ancora una traduzione.',
+    tPublished:'Pubblicato — è sulla mappa',
+    tDenied:'Permesso negato — attivalo nelle impostazioni del browser',
+    tNotFound:'Non riesco a trovare la tua posizione',
+    tNoGeo:'Questo dispositivo non supporta la geolocalizzazione',
+    tBadPhoto:'Foto non leggibile',
+    adminTitle:'Amministrazione', tabRequests:'Richieste', tabReports:'Segnalazioni',
+    noRequests:'Nessuna richiesta in attesa.', noReports:'Nessuna segnalazione.',
+    approve:'Approva', reject:'Rifiuta', pendingNote:'In attesa',
+    tApproved:'Approvato — ora è sulla mappa', tRejected:'Rifiutato',
+    tPendingSent:'Inviato — in attesa di approvazione',
+    reportBtn:'Segnala questo luogo', reportTitle:'Segnalazione',
+    reportReason:'Qual è il problema?', reportMsg:'Spiegaci meglio', reportMsgPh:'Scrivi i dettagli…',
+    sendReport:'Invia segnalazione',
+    reasonWrong:'Informazioni sbagliate', reasonFake:'Il luogo non esiste',
+    reasonOffensive:'Contenuto offensivo', reasonPhotos:'Problema con le foto', reasonOther:'Altro',
+    yourReport:'La tua segnalazione', replyPh:'Scrivi un messaggio…',
+    tReportSent:'Segnalazione inviata agli admin', tReplySent:'Messaggio inviato',
+    statusOpen:'Aperta', statusResolved:'Risolta', resolve:'Chiudi segnalazione',
+    gateTitle:'Accesso admin', gateHead:'Codice admin',
+    gateBody:'Questa pagina è solo per i moderatori. Inserisci il codice per vedere richieste e segnalazioni.',
+    gateEnter:'Entra', tBadCode:'Codice errato',
+    youTag:'Tu', adminTag:'Admin',
+    missing:'Manca ancora:', needLoc:'un punto sulla mappa', needName:'il nome del luogo',
+    needStory:'un testo più lungo (min 25 caratteri)',
+    searchPh:'Cerca un luogo, un paese…', noResults:'Nessun risultato.',
+    resultsFor:'Risultati',
+    tabAll:'Luoghi', editTitle:'Modifica luogo', saveChanges:'Salva modifiche',
+    deleteBtn:'Elimina luogo', confirmDel:'Sicuro? Tocca di nuovo per eliminare',
+    tSaved:'Modifiche salvate', tDeleted:'Luogo eliminato',
+    editingIn:'Stai modificando la versione in', noPlaces:'Nessun luogo.',
+    tabSite:'Sito', siteBrand:'Nome app', siteSub:'Sottotitolo',
+    siteMap:'Vista predefinita della mappa', useCurrentView:'Usa la vista attuale',
+    siteCode:'Codice admin', siteTexts:'Testi interfaccia',
+    siteTextsHint:'Correggi qualsiasi parola sbagliata nella lingua attuale. Si salva da solo.',
+    filterPh:'Filtra i testi…', resetText:'Ripristina', tSettingsSaved:'Salvato',
+    minDistLabel:'Distanza minima fra due luoghi (m)',
+    zoomIn:'Ingrandisci per caricare tutti i comuni', viaWiki:'da Wikipedia',
+    posApprox:'Posizione approssimativa — il dispositivo ha usato la rete, non il GPS. Tieni premuto il pulsante per impostarla a mano.',
+    setMyPos:'Imposta la tua posizione', setMyPosBody:'Sposta la mappa finché il cerchio è su di te', posManual:'manuale',
+    baseLabel:'Stile della mappa', baseGreen:'Verde scuro', baseEnglish:'Etichette in inglese', baseGrey:'Grigio',
+    writeAbout:'Racconta questo luogo', discovered:'wiki',
+    tooClose:'C\u0027è già un luogo molto vicino:', sameName:'Esiste già un luogo con questo nome:',
+    mergeHint:'Aggiungi lì quello che sai invece di creare un doppione.', seeIt:'Aprilo'
+  }
+  ,fr:{
+    dir:'ltr', label:'Français', brand:'Masalek',
+    nearYou:'Près de toi', onMap:'Lieux sur la carte',
+    emptyT:'La carte est vide', emptyB:"Sois le premier à parler de ta ville.",
+    addBtn:'Ajouter un lieu',
+    pickTitle:'Déplace la carte', pickBody:'Place le cercle sur le point', confirm:'Confirmer',
+    composerTitle:'Raconte ton lieu',
+    locLabel:'Position sur la carte', noLoc:'Aucun point choisi',
+    yourLoc:'Ta position actuelle', pickedLoc:'Choisi sur la carte', change:'Changer',
+    fName:'Nom du lieu', phName:'Sidi Bou Saïd',
+    fCountry:'Pays', phCountry:'Tunisie',
+    fTag:'Description en une ligne', phTag:'Un village blanc et bleu au-dessus de la mer',
+    fStory:'Raconte-le',
+    phStory:'Que doit voir un visiteur ? Quelle est la meilleure période ? Que manger ?',
+    fPhotos:'Photos', dropTitle:'Ajouter des photos', dropBody:"Jusqu'à 5 depuis le téléphone",
+    fAuthor:'Ton nom', phAuthor:'Anis de Nabeul',
+    publish:'Publier le lieu',
+    hint:'Version de test — les données restent sur ton appareil.',
+    factCountry:'Pays', factAuthor:'Écrit par', factCoords:'Coordonnées', factDist:'Distance',
+    anon:'Anonyme', m:'m', km:'km',
+    origin:"Ce texte a été écrit dans une autre langue et n'a pas encore de traduction.",
+    tPublished:'Publié',
+    tDenied:'Permission refusée — active-la dans les réglages du navigateur',
+    tNotFound:'Impossible de trouver ta position',
+    tNoGeo:'Cet appareil ne gère pas la géolocalisation',
+    tBadPhoto:'Photo illisible',
+    adminTitle:'Administration', tabRequests:'Demandes', tabReports:'Signalements',
+    noRequests:'Aucune demande en attente.', noReports:'Aucun signalement.',
+    approve:'Approuver', reject:'Refuser', pendingNote:'En attente',
+    tApproved:'Approuvé — maintenant sur la carte', tRejected:'Refusé',
+    tPendingSent:'Envoyé — en attente de validation',
+    reportBtn:'Signaler ce lieu', reportTitle:'Signalement',
+    reportReason:'Quel est le problème ?', reportMsg:'Explique-nous',
+    reportMsgPh:'Écris les détails…', sendReport:'Envoyer le signalement',
+    reasonWrong:'Information erronée', reasonFake:"Le lieu n'existe pas",
+    reasonOffensive:'Contenu offensant', reasonPhotos:'Problème avec les photos', reasonOther:'Autre',
+    yourReport:'Ton signalement', replyPh:'Écris un message…',
+    tReportSent:'Signalement envoyé aux admins', tReplySent:'Message envoyé',
+    statusOpen:'Ouvert', statusResolved:'Résolu', resolve:'Clore le signalement',
+    gateTitle:'Accès admin', gateHead:'Code admin',
+    gateBody:'Cette page est réservée aux modérateurs. Entre le code pour voir les demandes et les signalements.',
+    gateEnter:'Entrer', tBadCode:'Code incorrect',
+    youTag:'Toi', adminTag:'Admin',
+    missing:'Il manque :', needLoc:'un point sur la carte', needName:'le nom du lieu',
+    needStory:'un texte plus long (25 caractères min)',
+    searchPh:'Cherche un lieu, un pays…', noResults:'Aucun résultat.',
+    resultsFor:'Résultats',
+    tabAll:'Lieux', editTitle:'Modifier le lieu', saveChanges:'Enregistrer',
+    deleteBtn:'Supprimer le lieu', confirmDel:'Sûr ? Touche encore pour supprimer',
+    tSaved:'Modifications enregistrées', tDeleted:'Lieu supprimé',
+    editingIn:'Tu modifies la version en', noPlaces:'Aucun lieu.',
+    tabSite:'Site', siteBrand:"Nom de l'app", siteSub:'Sous-titre',
+    siteMap:'Vue par défaut de la carte', useCurrentView:'Utiliser la vue actuelle',
+    siteCode:'Code admin', siteTexts:"Textes de l'interface",
+    siteTextsHint:'Corrige tout mot erroné dans la langue affichée. Sauvegarde automatique.',
+    filterPh:'Filtrer les textes…', resetText:'Réinitialiser', tSettingsSaved:'Enregistré',
+    minDistLabel:'Distance minimale entre deux lieux (m)',
+    zoomIn:'Zoome pour charger toutes les communes', viaWiki:'de Wikipédia',
+    posApprox:"Position approximative — l'appareil a utilisé le réseau, pas le GPS. Maintiens le bouton pour la placer à la main.",
+    setMyPos:'Place ta position', setMyPosBody:'Déplace la carte jusqu\u0027à ce que le cercle soit sur toi', posManual:'manuel',
+    baseLabel:'Style de la carte', baseGreen:'Vert foncé', baseEnglish:'Libellés en anglais', baseGrey:'Gris',
+    writeAbout:'Raconte ce lieu', discovered:'wiki',
+    tooClose:'Un lieu existe déjà tout près :', sameName:'Un lieu porte déjà ce nom :',
+    mergeHint:'Complète celui-là au lieu de créer un doublon.', seeIt:'Ouvrir'
+  }
+};
+
+/* ---------- seed places (with translations) ---------- */
+const SEED = [
+{ id:'s1', lang:'ar', lat:36.8704, lng:10.3417,
+  name:'سيدي بو سعيد', country:'تونس', author:'أمين من قرطاج',
+  tag:'قرية زرقاء وبيضاء معلّقة فوق البحر',
+  story:'أشهر قرية فتونس، الأبواب زرق والحيوط بيض، والدروب كل ما تطلع فيها تلقى منظر على خليج تونس أحلى من اللي قبلو.\n\nاطلع لكافي الدلات، اشرب تاي بالصنوبر وقعد تتفرّج فالبحر. أحسن وقت هو قبل الغروب بساعة، وقتها الضو يولي ذهبي والزحمة تخف.\n\nما تنساش تنزل لمرسى سيدي بو سعيد الصغير من الدرج، الأغلبية ما يعرفوش الطريق هاذيكا.',
+  tr:{
+    en:{ name:'Sidi Bou Said', country:'Tunisia', author:'Amine, from Carthage',
+      tag:'A blue-and-white village hanging over the sea',
+      story:'Tunisia\u0027s most famous village: blue doors, white walls, and lanes where every climb opens onto a better view of the Gulf of Tunis.\n\nGo up to Café des Nattes, drink mint tea with pine nuts, and watch the water. Come about an hour before sunset — the light turns gold and the crowds thin out.\n\nDon\u0027t skip the stairs down to the small marina. Most visitors never find that path.' },
+    it:{ name:'Sidi Bou Said', country:'Tunisia', author:'Amine, da Cartagine',
+      tag:'Un villaggio bianco e blu sospeso sul mare',
+      story:'Il villaggio più famoso della Tunisia: porte blu, muri bianchi, e vicoli dove ogni salita apre una vista migliore sul Golfo di Tunisi.\n\nSali al Café des Nattes, bevi il tè alla menta con i pinoli e guarda il mare. Arriva un\u0027ora prima del tramonto — la luce diventa dorata e la folla si dirada.\n\nNon saltare la scalinata che scende al porticciolo. Quasi nessun turista trova quel sentiero.' }
+  }},
+{ id:'s2', lang:'ar', lat:36.7970, lng:10.1710,
+  name:'المدينة العتيقة', country:'تونس', author:'سنية من باب سويقة',
+  tag:'ألف سنة من الأسواق فقلب العاصمة',
+  story:'ادخل من باب البحر وامشي ديريكت. الطريق يوصلك للجامع الزيتونة، وفالطريق تلقى أسواق مقسّمة على حسب الصنعة: سوق البركة للذهب، سوق العطارين للعطر، سوق الشواشين للشاشية.\n\nنصيحة: اطلع لسطح واحد من البازارات القدام الجامع — يخليك تطلع بلا فلوس والمنظر على المدينة كامل.\n\nكل شي فيه المساومة. ابدا بنص السوم وتلاقاو فالوسط.',
+  tr:{
+    en:{ name:'The Medina of Tunis', country:'Tunisia', author:'Sania, from Bab Souika',
+      tag:'A thousand years of souks in the capital',
+      story:'Enter through Bab El Bhar and keep walking straight. The road leads to the Zitouna Mosque, and along the way the souks are split by trade: Souk El Berka for gold, El Attarine for perfume, Ech-Chaouachine for felt hats.\n\nTip: climb to the roof terrace of one of the bazaars facing the mosque. They let you up for free and the view covers the whole medina.\n\nEverything is negotiable. Start at half the asking price and meet in the middle.' },
+    it:{ name:'La Medina di Tunisi', country:'Tunisia', author:'Sania, da Bab Souika',
+      tag:'Mille anni di souk nel cuore della capitale',
+      story:'Entra da Bab El Bhar e cammina dritto. La strada porta alla Moschea Zitouna, e lungo il percorso i souk sono divisi per mestiere: Souk El Berka per l\u0027oro, El Attarine per i profumi, Ech-Chaouachine per i copricapi di feltro.\n\nConsiglio: sali sulla terrazza di uno dei bazar davanti alla moschea. Ti fanno salire gratis e la vista copre tutta la medina.\n\nSi contratta su tutto. Parti dalla metà del prezzo e incontratevi a metà strada.' }
+  }},
+{ id:'s3', lang:'ar', lat:35.2967, lng:10.7069,
+  name:'مدرج الجم', country:'تونس', author:'كريم من المهدية',
+  tag:'ثالث أكبر مدرج روماني فالدنيا',
+  story:'كولوسي روماني واقف فوسط بلاصة صغيرة، وتنجم تمشي فيه كامل — الأنفاق تحت، الدرجات فوق، بلا حواجز وبلا زحمة كيما روما.\n\nاطلع للطبقة الفوقانية وتخيّل 35 ألف واحد قاعدين. فالصيف فمّة مهرجان موسيقى سيمفونية يتعمل ديريكت فوسطو.\n\nاجي الصباح بكري، الشمس فالنص نهار تحرق والحجر ما فيهش ظل.',
+  tr:{
+    en:{ name:'El Jem Amphitheatre', country:'Tunisia', author:'Karim, from Mahdia',
+      tag:'The third-largest Roman amphitheatre in the world',
+      story:'A Roman colosseum standing in the middle of a small town — and you can walk all of it: the tunnels below, the tiers above, no barriers and none of Rome\u0027s crowds.\n\nClimb to the top tier and picture 35,000 people seated. In summer a symphonic music festival is held right inside it.\n\nCome early in the morning. Midday sun is brutal and the stone gives no shade.' },
+    it:{ name:'Anfiteatro di El Jem', country:'Tunisia', author:'Karim, da Mahdia',
+      tag:'Il terzo anfiteatro romano più grande al mondo',
+      story:'Un colosseo romano in mezzo a una cittadina — e puoi percorrerlo tutto: i sotterranei, le gradinate, senza barriere e senza le folle di Roma.\n\nSali all\u0027ultimo anello e immagina 35.000 persone sedute. D\u0027estate ci si tiene dentro un festival di musica sinfonica.\n\nVieni la mattina presto. Il sole di mezzogiorno è feroce e la pietra non fa ombra.' }
+  }},
+{ id:'s4', lang:'ar', lat:33.8756, lng:10.8570,
+  name:'حومة السوق', country:'تونس', author:'يوسف من جربة',
+  tag:'قلب جربة، موش الزون متاع الفنادق',
+  story:'أغلب اللي يجيو جربة يقعدو فالزون السياحي وما يشوفوش الجزيرة الحقيقية. حومة السوق هي البلاد.\n\nالأسواق فالصباح فيها الحوت الطري، الفخار متاع قلالة، والصوف. القهاوي فالساحة يقعدو فيها الناس متاع البلاد موش السواح.\n\nتحرّك بالبيسكلات — الجزيرة مسطحة كامل وما فماش مرتفعات.',
+  tr:{
+    en:{ name:'Houmt Souk', country:'Tunisia', author:'Youssef, from Djerba',
+      tag:'The real heart of Djerba, not the hotel strip',
+      story:'Most people who come to Djerba stay in the tourist zone and never see the island. Houmt Souk is the actual town.\n\nMorning markets have fresh fish, Guellala pottery and wool. The cafés on the square are full of locals, not tour groups.\n\nGet around by bicycle — the island is completely flat.' },
+    it:{ name:'Houmt Souk', country:'Tunisia', author:'Youssef, da Djerba',
+      tag:'Il vero cuore di Djerba, non la zona alberghiera',
+      story:'Quasi tutti quelli che vengono a Djerba restano nella zona alberghiera e non vedono mai l\u0027isola. Houmt Souk è la città vera.\n\nAl mattino i mercati hanno pesce fresco, ceramica di Guellala e lana. I caffè della piazza sono pieni di gente del posto, non di gruppi turistici.\n\nMuoviti in bicicletta — l\u0027isola è completamente piatta.' }
+  }},
+{ id:'s5', lang:'ar', lat:32.9142, lng:10.2725,
+  name:'شنني', country:'تونس', author:'مريم من تطاوين',
+  tag:'قرية أمازيغية معلّقة فالجبل',
+  story:'ديار محفورة فالجبل، والجامع الأبيض فالقمة. القرية القديمة تقريبا فارغة اليوم، الناس نزلو للجديدة تحت، أما الحجر باقي.\n\nاطلع للجامع على رجليك — 20 دقيقة طلوع، والمنظر على الوادي يستاهل التعب.\n\nقريب منها تطاوين ودوز إذا حبيت تكمل للصحرا.',
+  tr:{
+    en:{ name:'Chenini', country:'Tunisia', author:'Mariem, from Tataouine',
+      tag:'A Berber village clinging to the mountain',
+      story:'Houses carved into the rock, with a white mosque at the summit. The old village is nearly empty now — people moved down to the new one — but the stone is still there.\n\nWalk up to the mosque: twenty minutes of climbing, and the view over the valley is worth it.\n\nTataouine and Douz are close if you want to continue toward the desert.' },
+    it:{ name:'Chenini', country:'Tunisia', author:'Mariem, da Tataouine',
+      tag:'Un villaggio berbero aggrappato alla montagna',
+      story:'Case scavate nella roccia, con una moschea bianca in cima. Il villaggio vecchio oggi è quasi vuoto — la gente è scesa in quello nuovo — ma la pietra è rimasta.\n\nSali a piedi alla moschea: venti minuti di salita, e la vista sulla valle vale la fatica.\n\nTataouine e Douz sono vicine se vuoi proseguire verso il deserto.' }
+  }},
+{ id:'s6', lang:'ar', lat:36.7783, lng:8.6889,
+  name:'عين دراهم', country:'تونس', author:'حاتم من جندوبة',
+  tag:'غابة فلّين وضباب — تونس اللي ما تعرفهاش',
+  story:'ناس برشا ما يعرفوش إلّي فتونس فمّة جبال خضر وثلج فالشتاء. عين دراهم فوسط غابة الفلّين، الديار بأسقف حمرا كيما أوروبا.\n\nفالخريف الضباب ينزل على الغابة والريحة متاع الفلّين تعمّر. المشاوي والبربوشة بالجبلي أحسن ماكلة فالجهة.\n\nمن هنا تنجم تمشي لطبرقة ولا لعين سلطان.',
+  tr:{
+    en:{ name:'Aïn Draham', country:'Tunisia', author:'Hatem, from Jendouba',
+      tag:'Cork forest and fog — the Tunisia nobody expects',
+      story:'A lot of people don\u0027t know Tunisia has green mountains and snow in winter. Aïn Draham sits inside a cork oak forest, with red-roofed houses that look European.\n\nIn autumn the fog settles over the forest and the smell of cork fills the air. Grilled meat and mountain couscous are the best food in the region.\n\nFrom here you can carry on to Tabarka or Aïn Soltane.' },
+    it:{ name:'Aïn Draham', country:'Tunisia', author:'Hatem, da Jendouba',
+      tag:'Foresta di sughere e nebbia — la Tunisia inaspettata',
+      story:'Molti non sanno che la Tunisia ha montagne verdi e neve d\u0027inverno. Aïn Draham sta dentro una foresta di sughere, con case dai tetti rossi che sembrano europee.\n\nIn autunno la nebbia scende sul bosco e l\u0027odore del sughero riempie l\u0027aria. Carne alla brace e couscous di montagna sono il meglio della zona.\n\nDa qui puoi proseguire per Tabarka o Aïn Soltane.' }
+  }},
+{ id:'s7', lang:'ar', lat:33.9197, lng:8.1335,
+  name:'توزر', country:'تونس', author:'نور من توزر',
+  tag:'باب الصحرا وواحة نخل ما تنتهيش',
+  story:'المدينة القديمة مبنية بالطوب الأصفر بنقوش هندسية — بناية ما تلقاهاش فبلاصة أخرى فتونس.\n\nمنها تمشي لشط الجريد (البحيرة المالحة) وقت الشروق، ولشبيكة وتمغزة فالجبال، وللديكورات متاع Star Wars اللي باقية فالرمل.\n\nما تجيش فجويلية وأوت — السخانة تفوق 45 درجة. أكتوبر لأفريل هو الوقت.',
+  tr:{
+    en:{ name:'Tozeur', country:'Tunisia', author:'Nour, from Tozeur',
+      tag:'The gate of the desert and an endless palm oasis',
+      story:'The old town is built from yellow brick laid in geometric patterns — a style you won\u0027t find anywhere else in Tunisia.\n\nFrom here you can reach Chott el Djerid (the salt lake) at sunrise, Chebika and Tamerza in the mountains, and the Star Wars sets still standing in the sand.\n\nDon\u0027t come in July or August — it goes past 45°C. October to April is the season.' },
+    it:{ name:'Tozeur', country:'Tunisia', author:'Nour, da Tozeur',
+      tag:'La porta del deserto e un\u0027oasi di palme infinita',
+      story:'La città vecchia è costruita in mattoni gialli disposti a motivi geometrici — uno stile che non trovi altrove in Tunisia.\n\nDa qui raggiungi lo Chott el Djerid (il lago salato) all\u0027alba, Chebika e Tamerza sulle montagne, e i set di Star Wars ancora in piedi nella sabbia.\n\nNon venire a luglio o agosto — si superano i 45°C. Da ottobre ad aprile è la stagione giusta.' }
+  }}
+];
+
+
+/* ---------- French versions of the seed places ---------- */
+const FR_TR = {
+s1:{ name:'Sidi Bou Saïd', country:'Tunisie', author:'Amine, de Carthage',
+  tag:'Un village bleu et blanc suspendu au-dessus de la mer',
+  story:"Le village le plus connu de Tunisie : portes bleues, murs blancs, et des ruelles où chaque montée ouvre sur une vue encore plus belle du golfe de Tunis.\n\nMonte au Café des Nattes, bois un thé à la menthe aux pignons et regarde la mer. Viens une heure avant le coucher du soleil — la lumière devient dorée et la foule s'allège.\n\nNe rate pas l'escalier qui descend vers le petit port. Presque aucun visiteur ne trouve ce chemin." },
+s2:{ name:'La Médina de Tunis', country:'Tunisie', author:'Sania, de Bab Souika',
+  tag:'Mille ans de souks au cœur de la capitale',
+  story:"Entre par Bab El Bhar et marche tout droit. La route mène à la mosquée Zitouna, et en chemin les souks sont répartis par métier : Souk El Berka pour l'or, El Attarine pour le parfum, Ech-Chaouachine pour les chéchias.\n\nConseil : monte sur la terrasse d'un des bazars face à la mosquée. On te laisse monter gratuitement et la vue couvre toute la médina.\n\nTout se négocie. Commence à la moitié du prix et retrouvez-vous au milieu." },
+s3:{ name:"Amphithéâtre d'El Jem", country:'Tunisie', author:'Karim, de Mahdia',
+  tag:'Le troisième plus grand amphithéâtre romain du monde',
+  story:"Un colisée romain planté au milieu d'une petite ville — et tu peux le parcourir entièrement : les souterrains, les gradins, sans barrières et sans la foule de Rome.\n\nMonte au dernier niveau et imagine 35 000 personnes assises. L'été, un festival de musique symphonique s'y tient à l'intérieur.\n\nViens tôt le matin. Le soleil de midi est brutal et la pierre ne donne aucune ombre." },
+s4:{ name:'Houmt Souk', country:'Tunisie', author:'Youssef, de Djerba',
+  tag:'Le vrai cœur de Djerba, pas la zone hôtelière',
+  story:"La plupart des gens qui viennent à Djerba restent dans la zone touristique et ne voient jamais l'île. Houmt Souk, c'est la vraie ville.\n\nLe matin, les marchés offrent du poisson frais, la poterie de Guellala et de la laine. Les cafés de la place sont remplis d'habitants, pas de groupes de touristes.\n\nDéplace-toi à vélo — l'île est entièrement plate." },
+s5:{ name:'Chenini', country:'Tunisie', author:'Mariem, de Tataouine',
+  tag:'Un village berbère accroché à la montagne',
+  story:"Des maisons creusées dans la roche, avec une mosquée blanche au sommet. Le vieux village est presque vide aujourd'hui — les gens sont descendus dans le nouveau — mais la pierre est restée.\n\nMonte à pied jusqu'à la mosquée : vingt minutes de grimpe, et la vue sur la vallée vaut l'effort.\n\nTataouine et Douz sont proches si tu veux continuer vers le désert." },
+s6:{ name:'Aïn Draham', country:'Tunisie', author:'Hatem, de Jendouba',
+  tag:"Forêt de chênes-lièges et brouillard — la Tunisie qu'on n'attend pas",
+  story:"Beaucoup ignorent que la Tunisie a des montagnes vertes et de la neige en hiver. Aïn Draham est au milieu d'une forêt de chênes-lièges, avec des maisons aux toits rouges qui semblent européennes.\n\nEn automne, le brouillard descend sur la forêt et l'odeur du liège remplit l'air. Les grillades et le couscous de montagne sont ce qu'on mange de mieux dans la région.\n\nD'ici tu peux continuer vers Tabarka ou Aïn Soltane." },
+s7:{ name:'Tozeur', country:'Tunisie', author:'Nour, de Tozeur',
+  tag:"La porte du désert et une oasis de palmiers sans fin",
+  story:"La vieille ville est bâtie en briques jaunes posées en motifs géométriques — un style qu'on ne trouve nulle part ailleurs en Tunisie.\n\nD'ici tu rejoins le Chott el Djerid (le lac salé) au lever du soleil, Chebika et Tamerza dans les montagnes, et les décors de Star Wars encore debout dans le sable.\n\nNe viens pas en juillet ou août — ça dépasse 45 °C. D'octobre à avril, c'est la saison." }
+};
+function mergeFR(list){
+  list.forEach(p => { if(FR_TR[p.id]){ p.tr = p.tr || {}; p.tr.fr = FR_TR[p.id]; } });
+  const have = new Set(list.map(p => p.id));
+  SEED.forEach(sd => {
+    if(!have.has(sd.id)) list.push(sd);
+    else { const p = list.find(x => x.id === sd.id); if(sd.wiki && !p.wiki) p.wiki = sd.wiki; }
+  });
+  return list;
+}
+mergeFR(SEED);
+
+
+/* ---------- more places: Tunisia + Italy ---------- */
+const WIKI = { s1:'Sidi Bou Said', s2:'Medina of Tunis', s3:'Amphitheatre of El Jem',
+  s4:'Houmt Souk', s5:'Chenini', s6:'Aïn Draham', s7:'Tozeur' };
+SEED.forEach(p => { if(WIKI[p.id]) p.wiki = WIKI[p.id]; });
+
+const MORE_PLACES = [
+{ id:'t8', lang:'ar', lat:36.4230, lng:9.2190, wiki:'Dougga',
+  name:'دقة', country:'تونس', author:'صابر من تبرسق',
+  tag:'أكمل مدينة رومانية باقية فشمال إفريقيا',
+  story:'مدينة كاملة على ضهر جبل: الكابيتول، المسرح، الحمّامات، وحتى الدروب. تمشي فيها وحدك تقريبا — ما فماش زحمة كيما فبلايص أخرى.\n\nاجي الصباح والبس صباط مريّح، المشي برشا والأرض حجر.',
+  tr:{ en:{ name:'Dougga', country:'Tunisia', author:'Saber, from Teboursouk',
+      tag:'The best-preserved Roman town in North Africa',
+      story:'A whole city on a hillside: the Capitol, the theatre, the baths, even the streets. You walk it almost alone — none of the crowds you get elsewhere.\n\nCome in the morning and wear proper shoes. It is a lot of walking on stone.' },
+    it:{ name:'Dougga', country:'Tunisia', author:'Saber, da Teboursouk',
+      tag:'La città romana meglio conservata del Nord Africa',
+      story:'Una città intera su una collina: il Campidoglio, il teatro, le terme, perfino le strade. La percorri quasi da solo — niente folla come altrove.\n\nVieni la mattina e metti scarpe comode. Si cammina molto sulla pietra.' },
+    fr:{ name:'Dougga', country:'Tunisie', author:'Saber, de Téboursouk',
+      tag:"La ville romaine la mieux conservée d'Afrique du Nord",
+      story:"Une ville entière sur une colline : le Capitole, le théâtre, les thermes, même les rues. Tu la parcours presque seul — aucune foule.\n\nViens le matin et mets de bonnes chaussures. Ça marche beaucoup, sur la pierre." } } },
+
+{ id:'t9', lang:'ar', lat:35.6810, lng:10.1030, wiki:'Great Mosque of Kairouan',
+  name:'جامع القيروان', country:'تونس', author:'إلياس من القيروان',
+  tag:'أقدم جامع فالمغرب العربي، ورابع مدينة مقدسة',
+  story:'الصحن كبير وفارغ، والحجر الأبيض يعكس الضو حتى يعمي. المنارة أقدم منارة واقفة فالدنيا.\n\nغير المسلمين يدخلو للصحن موش لقاعة الصلاة. بعد الجامع دور فالمدينة وشري مقروض طري.',
+  tr:{ en:{ name:'Great Mosque of Kairouan', country:'Tunisia', author:'Ilyes, from Kairouan',
+      tag:'The oldest mosque in the Maghreb, in a holy city',
+      story:'The courtyard is huge and bare, and the white stone throws back the light hard enough to blind you. The minaret is the oldest one still standing anywhere.\n\nNon-Muslims can enter the courtyard but not the prayer hall. Afterwards walk the medina and buy makroudh warm.' },
+    it:{ name:'Grande Moschea di Kairouan', country:'Tunisia', author:'Ilyes, da Kairouan',
+      tag:'La moschea più antica del Maghreb, in una città santa',
+      story:'Il cortile è enorme e spoglio, e la pietra bianca rimanda una luce quasi accecante. Il minareto è il più antico ancora in piedi al mondo.\n\nI non musulmani entrano nel cortile ma non nella sala di preghiera. Poi gira la medina e compra i makroudh caldi.' },
+    fr:{ name:'Grande Mosquée de Kairouan', country:'Tunisie', author:'Ilyes, de Kairouan',
+      tag:'La plus ancienne mosquée du Maghreb, dans une ville sainte',
+      story:"La cour est immense et nue, et la pierre blanche renvoie une lumière presque aveuglante. Le minaret est le plus ancien encore debout au monde.\n\nLes non-musulmans entrent dans la cour mais pas dans la salle de prière. Ensuite parcours la médina et achète des makrouds tièdes." } } },
+
+{ id:'t10', lang:'ar', lat:37.2780, lng:9.8740, wiki:'Bizerte',
+  name:'بنزرت — الميناء القديم', country:'تونس', author:'ريم من بنزرت',
+  tag:'أقصى نقطة فإفريقيا، وميناء صيّادين ما تبدّلش',
+  story:'الفلايك الزرق راقدة قدّام ديار بيض وقصبة قديمة. المكان صغير أما هو الحقيقي — الصيّادين خدّامين موش ديكور.\n\nكول الحوت فقهوة على الرصيف، وبعد اطلع لكاب أنجلة إذا عندك كرهبة.',
+  tr:{ en:{ name:'Bizerte Old Port', country:'Tunisia', author:'Rim, from Bizerte',
+      tag:'The northernmost point of Africa, and a fishing port that never changed',
+      story:'Blue boats resting in front of white houses and an old kasbah. The place is small but real — the fishermen are working, not posing.\n\nEat fish at a café on the quay, then drive up to Cap Angela if you have a car.' },
+    it:{ name:'Porto vecchio di Biserta', country:'Tunisia', author:'Rim, da Biserta',
+      tag:"Il punto più a nord dell'Africa, e un porto di pescatori mai cambiato",
+      story:'Barche blu ferme davanti a case bianche e a una vecchia kasbah. Il posto è piccolo ma vero — i pescatori lavorano, non posano.\n\nMangia pesce in un caffè sulla banchina, poi sali a Capo Angela se hai la macchina.' },
+    fr:{ name:'Vieux port de Bizerte', country:'Tunisie', author:'Rim, de Bizerte',
+      tag:"Le point le plus au nord de l'Afrique, et un port de pêche inchangé",
+      story:"Des barques bleues posées devant des maisons blanches et une vieille kasbah. L'endroit est petit mais vrai — les pêcheurs travaillent, ils ne posent pas.\n\nMange du poisson dans un café sur le quai, puis monte au cap Angela si tu as une voiture." } } },
+
+{ id:'t11', lang:'ar', lat:35.8280, lng:10.6380, wiki:'Ribat of Sousse',
+  name:'رباط سوسة', country:'تونس', author:'وسام من سوسة',
+  tag:'حصن إسلامي من القرن الثامن على البحر',
+  story:'حصن صغير أما قوي، بنوه المرابطين باش يعسّو على الساحل. اطلع للبرج، منظر على المدينة العتيقة والميناء كامل.\n\nالمدينة العتيقة متاع سوسة قدّام مباشرة، والسوق فيها كل شي بلا أسعار سوّاح.',
+  tr:{ en:{ name:'Ribat of Sousse', country:'Tunisia', author:'Wissem, from Sousse',
+      tag:'An eighth-century Islamic fort facing the sea',
+      story:'A small but solid fort, built by warrior-monks to watch the coast. Climb the tower for a view over the whole old town and the harbour.\n\nThe medina starts right at its door, and the souk still has normal prices.' },
+    it:{ name:'Ribat di Sousse', country:'Tunisia', author:'Wissem, da Sousse',
+      tag:"Una fortezza islamica dell'VIII secolo sul mare",
+      story:'Una fortezza piccola ma solida, costruita da monaci-guerrieri per sorvegliare la costa. Sali sulla torre: la vista prende tutta la medina e il porto.\n\nLa medina comincia proprio davanti, e il souk ha ancora prezzi normali.' },
+    fr:{ name:'Ribat de Sousse', country:'Tunisie', author:'Wissem, de Sousse',
+      tag:'Une forteresse islamique du VIIIe siècle face à la mer',
+      story:"Une forteresse petite mais solide, bâtie par des moines-soldats pour surveiller la côte. Monte à la tour : la vue prend toute la médina et le port.\n\nLa médina commence juste devant, et le souk garde des prix normaux." } } },
+
+{ id:'t12', lang:'ar', lat:32.9930, lng:9.6320, wiki:'Ksar Ghilane',
+  name:'قصر غيلان', country:'تونس', author:'زياد من دوز',
+  tag:'واحة وعين سخونة فوسط الرمل',
+  story:'آخر نقطة قبل العرق الشرقي الكبير. عين ماء سخون وسط النخل، والكثبان تبدا مباشرة من ورا الخيام.\n\nالليل هو السبب الحقيقي: بلا ضو مدينة، النجوم تبان كيما ما شفتهمش عمرك.',
+  tr:{ en:{ name:'Ksar Ghilane', country:'Tunisia', author:'Ziad, from Douz',
+      tag:'An oasis and a hot spring in the middle of the sand',
+      story:'The last stop before the Grand Erg Oriental. A warm spring sits among the palms, and the dunes start right behind the tents.\n\nThe night is the real reason to come: with no city light, the stars are like nothing you have seen.' },
+    it:{ name:'Ksar Ghilane', country:'Tunisia', author:'Ziad, da Douz',
+      tag: "Un'oasi e una sorgente calda in mezzo alla sabbia",
+      story:"L'ultima tappa prima del Grande Erg Orientale. Una sorgente tiepida tra le palme, e le dune iniziano subito dietro le tende.\n\nLa notte è il vero motivo per venire: senza luci di città, le stelle sono come non le hai mai viste." },
+    fr:{ name:'Ksar Ghilane', country:'Tunisie', author:'Ziad, de Douz',
+      tag:'Une oasis et une source chaude au milieu du sable',
+      story:"La dernière étape avant le Grand Erg Oriental. Une source tiède au milieu des palmiers, et les dunes commencent juste derrière les tentes.\n\nLa nuit est la vraie raison de venir : sans lumière de ville, les étoiles sont comme nulle part ailleurs." } } },
+
+{ id:'t13', lang:'ar', lat:36.9540, lng:8.7580, wiki:'Tabarka',
+  name:'طبرقة', country:'تونس', author:'أنيس من طبرقة',
+  tag:'صخور فالبحر، غابة، وقلعة جنوية',
+  story:'الإبر — صخور طالعة من الماء ديركت — هي علامة البلاد. القلعة الجنوية فوق الجزيرة تشرف على كل شي.\n\nالغطس هنا من الأحسن فتونس. وفالصيف فمّة مهرجان الجاز على البحر.',
+  tr:{ en:{ name:'Tabarka', country:'Tunisia', author:'Anis, from Tabarka',
+      tag:'Sea rocks, forest, and a Genoese fort',
+      story:'The Needles — rocks rising straight out of the water — are the town\u0027s signature. The Genoese fort on the island looks over all of it.\n\nDiving here is among the best in Tunisia, and in summer there is a jazz festival by the sea.' },
+    it:{ name:'Tabarka', country:'Tunisia', author:'Anis, da Tabarka',
+      tag:'Scogli nel mare, foresta e un forte genovese',
+      story:'Gli Aghi — scogli che escono dritti dall\u0027acqua — sono il simbolo della città. Il forte genovese sull\u0027isola domina tutto.\n\nLe immersioni qui sono tra le migliori della Tunisia, e d\u0027estate c\u0027è un festival jazz sul mare.' },
+    fr:{ name:'Tabarka', country:'Tunisie', author:'Anis, de Tabarka',
+      tag:'Des rochers dans la mer, la forêt et un fort génois',
+      story:"Les Aiguilles — des rochers qui sortent droit de l'eau — sont la signature de la ville. Le fort génois sur l'île domine l'ensemble.\n\nLa plongée ici est parmi les meilleures de Tunisie, et l'été il y a un festival de jazz au bord de la mer." } } },
+
+{ id:'i1', lang:'it', lat:41.8890, lng:12.4700, wiki:'Trastevere',
+  name:'Trastevere', country:'Italia', author:'Giulia, da Roma',
+  tag:'Il quartiere che a Roma si vive di sera',
+  story:'Vicoli stretti, edera sui muri, e piazze che si riempiono dopo il tramonto. Di giorno è tranquillo: entra a Santa Maria in Trastevere quando la luce accende i mosaici dorati.\n\nEvita i ristoranti col menù in cinque lingue. Sali al Gianicolo per il tramonto sui tetti.',
+  tr:{ ar:{ name:'ترستيفيري', country:'إيطاليا', author:'جوليا من روما',
+      tag:'الحومة اللي روما تتعاش فيها بالليل',
+      story:'دروب ضيّقة، نبات على الحيوط، وساحات تتعمّر بعد الغروب. فالنهار هادية: ادخل لكنيسة سانتا ماريا كي الضو يولّع الفسيفساء الذهبي.\n\nابعد على المطاعم اللي المنيو متاعها بخمس لغات. اطلع للجانيكولو وقت الغروب.' },
+    en:{ name:'Trastevere', country:'Italy', author:'Giulia, from Rome',
+      tag:'The Rome neighbourhood that comes alive after dark',
+      story:'Narrow lanes, ivy on the walls, and squares that fill up after sunset. It is quiet by day: step into Santa Maria in Trastevere when the light hits the gold mosaics.\n\nSkip any restaurant with a menu in five languages. Walk up the Gianicolo for sunset over the rooftops.' },
+    fr:{ name:'Trastevere', country:'Italie', author:'Giulia, de Rome',
+      tag:'Le quartier de Rome qui se vit le soir',
+      story:"Des ruelles étroites, du lierre sur les murs, et des places qui se remplissent après le coucher du soleil. Le jour c'est calme : entre à Santa Maria in Trastevere quand la lumière allume les mosaïques dorées.\n\nÉvite les restaurants au menu en cinq langues. Monte au Janicule pour le coucher de soleil." } } },
+
+{ id:'i2', lang:'it', lat:40.6664, lng:16.6043, wiki:'Sassi di Matera',
+  name:'I Sassi di Matera', country:'Italia', author:'Domenico, da Matera',
+  tag:'Una città scavata nella roccia, abitata da novemila anni',
+  story:'Case, chiese e scale ricavate dentro il calcare, una sopra l\u0027altra. Fino agli anni Cinquanta ci si viveva con gli animali; oggi è patrimonio UNESCO.\n\nGuardala dal belvedere di Murgia Timone, dall\u0027altra parte del vallone. Di notte è tutta luci gialle.',
+  tr:{ ar:{ name:'ساسي ماتيرا', country:'إيطاليا', author:'دومينيكو من ماتيرا',
+      tag:'مدينة محفورة فالصخر، معمورة من تسعة آلاف سنة',
+      story:'ديار وكنايس ودرج محفورين فالحجر الكلسي، وحدة فوق الأخرى. حتى الخمسينات كانو يعيشو فيها مع البهايم؛ اليوم ولات تراث عالمي.\n\nشوفها من الجيهة الأخرى متاع الوادي. بالليل تولي كلها أضواء صفرا.' },
+    en:{ name:'The Sassi of Matera', country:'Italy', author:'Domenico, from Matera',
+      tag:'A town carved into rock, lived in for nine thousand years',
+      story:'Houses, churches and stairs cut into the limestone, stacked on each other. People lived here with their animals until the 1950s; today it is a UNESCO site.\n\nSee it from the Murgia Timone lookout across the ravine. At night it is all yellow light.' },
+    fr:{ name:'Les Sassi de Matera', country:'Italie', author:'Domenico, de Matera',
+      tag:'Une ville creusée dans la roche, habitée depuis neuf mille ans',
+      story:"Des maisons, des églises et des escaliers taillés dans le calcaire, empilés les uns sur les autres. On y vivait avec les bêtes jusqu'aux années 1950 ; c'est aujourd'hui un site UNESCO.\n\nRegarde-la depuis le belvédère de Murgia Timone, de l'autre côté du ravin. La nuit, tout est lumière jaune." } } },
+
+{ id:'i3', lang:'it', lat:44.1350, lng:9.6844, wiki:'Vernazza',
+  name:'Vernazza', country:'Italia', author:'Marta, dalle Cinque Terre',
+  tag:'Case colorate strette in una caletta ligure',
+  story:'Il porticciolo più bello delle Cinque Terre: barche tirate a secco in piazza e case rosa e gialle addossate alla roccia.\n\nArriva in treno, non in macchina — non c\u0027è dove parcheggiare. E fai il sentiero verso Monterosso: due ore, tutte sul mare.',
+  tr:{ ar:{ name:'فيرناتزا', country:'إيطاليا', author:'مارتا من تشينكوي تيري',
+      tag:'ديار ملوّنة متلاصقة فخليج صغير',
+      story:'أحلى ميناء صغير فتشينكوي تيري: فلايك مطلوعة فالساحة وديار وردية وصفرا ملصقة فالصخر.\n\nاجي بالتران موش بالكرهبة — ما فماش وين تحط. وامشي المسلك لمونتيروسو: ساعتين كامل على البحر.' },
+    en:{ name:'Vernazza', country:'Italy', author:'Marta, from the Cinque Terre',
+      tag:'Coloured houses packed into a Ligurian cove',
+      story:'The prettiest little harbour in the Cinque Terre: boats pulled up into the square and pink and yellow houses pressed against the rock.\n\nCome by train, not by car — there is nowhere to park. And walk the trail to Monterosso: two hours, all of it above the sea.' },
+    fr:{ name:'Vernazza', country:'Italie', author:'Marta, des Cinque Terre',
+      tag:'Des maisons colorées serrées dans une crique ligure',
+      story:"Le plus joli petit port des Cinque Terre : des barques tirées sur la place et des maisons roses et jaunes collées au rocher.\n\nViens en train, pas en voiture — il n'y a nulle part où se garer. Et fais le sentier vers Monterosso : deux heures, toutes au-dessus de la mer." } } },
+
+{ id:'i4', lang:'it', lat:40.8490, lng:14.2570, wiki:'Spaccanapoli',
+  name:'Spaccanapoli', country:'Italia', author:'Ciro, da Napoli',
+  tag:'La strada dritta che taglia Napoli in due',
+  story:'Una linea greca di duemila anni che attraversa il centro: botteghe, chiese barocche, panni stesi e motorini che passano a un palmo.\n\nMangia la pizza dove c\u0027è la fila di napoletani. E scendi a Napoli Sotterranea: la città continua sotto i tuoi piedi.',
+  tr:{ ar:{ name:'سباكانابولي', country:'إيطاليا', author:'تشيرو من نابولي',
+      tag:'الشارع المستقيم اللي يقسّم نابولي على زوز',
+      story:'خط يوناني عمرو ألفين سنة يشقّ وسط المدينة: حوانت، كنايس باروكية، حوايج منشورة، ومطورات تعدّي جنبك.\n\nكول البيتزا وين تلقى الصف متاع أهل البلاد. وانزل لنابولي التحتانية: المدينة تتواصل تحت رجليك.' },
+    en:{ name:'Spaccanapoli', country:'Italy', author:'Ciro, from Naples',
+      tag:'The straight street that splits Naples in two',
+      story:'A two-thousand-year-old Greek line cutting through the centre: workshops, baroque churches, laundry overhead and scooters passing inches away.\n\nEat pizza wherever the queue is Neapolitan. Then go down into Napoli Sotterranea — the city keeps going under your feet.' },
+    fr:{ name:'Spaccanapoli', country:'Italie', author:'Ciro, de Naples',
+      tag:'La rue droite qui coupe Naples en deux',
+      story:"Une ligne grecque de deux mille ans qui traverse le centre : ateliers, églises baroques, linge tendu au-dessus et scooters qui frôlent.\n\nMange la pizza là où la file est napolitaine. Puis descends à Napoli Sotterranea : la ville continue sous tes pieds." } } },
+
+{ id:'i5', lang:'it', lat:45.4430, lng:12.3300, wiki:'Cannaregio',
+  name:'Cannaregio', country:'Italia', author:'Elena, da Venezia',
+  tag:'La Venezia dove i veneziani vivono ancora',
+  story:'A dieci minuti da San Marco e senza la folla: fondamenta lunghe sull\u0027acqua, bacari dove si mangiano i cicchetti in piedi, e il Ghetto, il primo del mondo.\n\nVai verso sera, quando i canali diventano arancioni e le barche della spesa rientrano.',
+  tr:{ ar:{ name:'كانّاريجو', country:'إيطاليا', author:'إيلينا من البندقية',
+      tag:'البندقية اللي أهلها باقين عايشين فيها',
+      story:'عشر دقايق من سان ماركو وبلا زحمة: أرصفة طويلة على الماء، حوانت صغار تاكل فيهم واقف، والغيتو، أول واحد فالدنيا.\n\nامشي وقت العشية، كي القنوات تولي برتقالية والفلايك ترجع.' },
+    en:{ name:'Cannaregio', country:'Italy', author:'Elena, from Venice',
+      tag:'The Venice where Venetians still live',
+      story:'Ten minutes from San Marco and none of the crowd: long quays along the water, bacari where you eat cicchetti standing up, and the Ghetto, the first one in the world.\n\nGo towards evening, when the canals turn orange and the delivery boats head home.' },
+    fr:{ name:'Cannaregio', country:'Italie', author:'Elena, de Venise',
+      tag:'La Venise où les Vénitiens vivent encore',
+      story:"À dix minutes de Saint-Marc et sans la foule : de longs quais le long de l'eau, des bacari où l'on mange les cicchetti debout, et le Ghetto, le premier au monde.\n\nVas-y vers le soir, quand les canaux virent à l'orange et que les barques de livraison rentrent." } } },
+
+{ id:'i6', lang:'it', lat:38.1110, lng:13.3600, wiki:'Palermo',
+  name:'Ballarò, Palermo', country:'Italia', author:'Rosario, da Palermo',
+  tag:'Un mercato arabo rimasto nel cuore della Sicilia',
+  story:'Le voci dei venditori — l\u0027abbanniata — si sentono da due strade prima. Banchi di pesce, spezie e frutta sotto teli tirati fra i palazzi scrostati.\n\nMangia in piedi: panelle, sfincione, arancine. È il posto in Italia che assomiglia di più a un souk.',
+  tr:{ ar:{ name:'باللارو، باليرمو', country:'إيطاليا', author:'روزاريو من باليرمو',
+      tag:'سوق عربي باقي فقلب صقلية',
+      story:'أصوات الباعة تسمعها من زوز شوارع قبل. طاولات حوت وتوابل وغلّة تحت أقمشة مشدودة بين البنايات القديمة.\n\nكول واقف: بانيلي، سفينشوني، أرانتشيني. هي البلاصة فإيطاليا الأقرب للسوق متاعنا.' },
+    en:{ name:'Ballarò, Palermo', country:'Italy', author:'Rosario, from Palermo',
+      tag:'An Arab market still beating in the heart of Sicily',
+      story:'You hear the sellers calling — the abbanniata — two streets before you arrive. Fish, spices and fruit under sheets strung between peeling buildings.\n\nEat standing: panelle, sfincione, arancine. It is the place in Italy closest to a souk.' },
+    fr:{ name:'Ballarò, Palerme', country:'Italie', author:'Rosario, de Palerme',
+      tag:'Un marché arabe resté au cœur de la Sicile',
+      story:"On entend les vendeurs — l'abbanniata — deux rues avant d'arriver. Poissons, épices et fruits sous des bâches tendues entre les façades écaillées.\n\nMange debout : panelle, sfincione, arancine. C'est l'endroit d'Italie qui ressemble le plus à un souk." } } }
+];
+SEED.push(...MORE_PLACES);
+
+const BULK_PLACES = [
+{ id:'t14', lang:'ar', lat:36.8528, lng:10.3230, wiki:'Carthage',
+  name:'قرطاج', country:'تونس', author:'ليلى من المرسى', tag:'اللي بقى من الإمبراطورية اللي حاربت روما',
+  story:'حمّامات أنطونيوس على البحر ديركت، والتل البونيقي فوق. المدينة اللي خوّفت روما توّا حومة هادية.\n\nخوذ التي جي أم من تونس، ينزّلك بين المواقع وحدة وحدة.',
+  tr:{ en:{ name:'Carthage', country:'Tunisia', author:'Leila, from La Marsa', tag:'What is left of the empire that fought Rome',
+      story:'The Antonine Baths sit right on the sea, with the Punic hill above. The city that frightened Rome is now a quiet suburb.\n\nTake the TGM train from Tunis; it stops at the sites one by one.' },
+    it:{ name:'Cartagine', country:'Tunisia', author:'Leila, da La Marsa', tag:"Ciò che resta dell'impero che sfidò Roma",
+      story:'Le Terme di Antonino stanno proprio sul mare, con la collina punica sopra. La città che spaventò Roma oggi è un quartiere tranquillo.\n\nPrendi il treno TGM da Tunisi: ferma ai siti uno per uno.' },
+    fr:{ name:'Carthage', country:'Tunisie', author:'Leila, de La Marsa', tag:"Ce qui reste de l'empire qui a défié Rome",
+      story:"Les thermes d'Antonin donnent directement sur la mer, avec la colline punique au-dessus. La ville qui effrayait Rome est aujourd'hui une banlieue calme.\n\nPrends le TGM depuis Tunis : il dessert les sites un par un." } } },
+
+{ id:'t15', lang:'ar', lat:36.7998, lng:10.1830, wiki:'Avenue Habib Bourguiba',
+  name:'شارع الحبيب بورقيبة', country:'تونس', author:'مهدي من تونس', tag:'قلب العاصمة، والشارع اللي صار فيه كل شي',
+  story:'شارع واسع بأشجار فالوسط، مسرح بلدي أبيض، وقهاوي على الرصيف. هوني تحس بالعاصمة كيما هي.\n\nامشيه عالعشية من ساعة أربعة، وقتها الناس تخرج والشارع يولي حي.',
+  tr:{ en:{ name:'Avenue Habib Bourguiba', country:'Tunisia', author:'Mehdi, from Tunis', tag:'The spine of the capital, where everything happened',
+      story:'A wide avenue with trees down the middle, a white municipal theatre, and pavement cafés. This is the capital as it actually is.\n\nWalk it in the late afternoon, when the city comes out.' },
+    it:{ name:'Avenue Habib Bourguiba', country:'Tunisia', author:'Mehdi, da Tunisi', tag:'La spina dorsale della capitale, dove è successo tutto',
+      story:'Un viale largo con alberi al centro, un teatro municipale bianco e caffè sul marciapiede. Qui la capitale è quella vera.\n\nPercorrilo nel tardo pomeriggio, quando la città esce di casa.' },
+    fr:{ name:'Avenue Habib Bourguiba', country:'Tunisie', author:'Mehdi, de Tunis', tag:"L'artère de la capitale, où tout s'est joué",
+      story:"Une large avenue avec des arbres au milieu, un théâtre municipal blanc et des cafés en terrasse. Ici, la capitale est celle de tous les jours.\n\nParcours-la en fin d'après-midi, quand la ville sort." } } },
+
+{ id:'t16', lang:'ar', lat:36.8093, lng:10.1345, wiki:'Bardo National Museum (Tunis)',
+  name:'متحف باردو', country:'تونس', author:'أسماء من باردو', tag:'أكبر مجموعة فسيفساء رومانية فالعالم',
+  story:'قصر بايي معمّر بأرضيات فسيفساء كاملة، مرفوعة من فيلات رومانية فتونس كاملة. حاجة ما تلقاهاش حتى فروما.\n\nخصّصلو ساعتين على الأقل، وابدا بالطابق الفوقاني.',
+  tr:{ en:{ name:'Bardo Museum', country:'Tunisia', author:'Asma, from Bardo', tag:'The largest collection of Roman mosaics on earth',
+      story:'A beylical palace filled with complete mosaic floors, lifted from Roman villas across Tunisia. You will not see this even in Rome.\n\nGive it two hours minimum, and start on the upper floor.' },
+    it:{ name:'Museo del Bardo', country:'Tunisia', author:'Asma, dal Bardo', tag:'La più grande raccolta di mosaici romani al mondo',
+      story:'Un palazzo beylicale pieno di pavimenti a mosaico interi, staccati da ville romane di tutta la Tunisia. Non lo vedi nemmeno a Roma.\n\nCalcola almeno due ore e comincia dal piano superiore.' },
+    fr:{ name:'Musée du Bardo', country:'Tunisie', author:'Asma, du Bardo', tag:'La plus grande collection de mosaïques romaines au monde',
+      story:"Un palais beylical rempli de sols en mosaïque entiers, prélevés dans les villas romaines de toute la Tunisie. On ne voit pas ça, même à Rome.\n\nCompte deux heures minimum et commence par l'étage." } } },
+
+{ id:'t17', lang:'ar', lat:36.4000, lng:10.6167, wiki:'Hammamet',
+  name:'الحمامات', country:'تونس', author:'فرح من الحمامات', tag:'قصبة بيضاء على شط رملي',
+  story:'القصبة القديمة واقفة ديركت على البحر، وتحتها مقبرة بيضا وشط. المدينة العتيقة صغيرة أما نظيفة وهادية.\n\nابعد على الزون السياحي الشمالي وقعد فالمدينة القديمة.',
+  tr:{ en:{ name:'Hammamet', country:'Tunisia', author:'Farah, from Hammamet', tag:'A white kasbah on a sand beach',
+      story:'The old kasbah stands straight on the sea, with a white cemetery and the beach below it. The medina is small, clean and calm.\n\nSkip the northern resort strip and stay in the old town.' },
+    it:{ name:'Hammamet', country:'Tunisia', author:'Farah, da Hammamet', tag:'Una kasbah bianca su una spiaggia di sabbia',
+      story:'La vecchia kasbah è a picco sul mare, con un cimitero bianco e la spiaggia sotto. La medina è piccola, pulita e tranquilla.\n\nEvita la zona alberghiera a nord e fermati nella città vecchia.' },
+    fr:{ name:'Hammamet', country:'Tunisie', author:'Farah, de Hammamet', tag:'Une kasbah blanche sur une plage de sable',
+      story:"La vieille kasbah tombe droit sur la mer, avec un cimetière blanc et la plage en dessous. La médina est petite, propre et calme.\n\nÉvite la zone hôtelière au nord et loge dans la vieille ville." } } },
+
+{ id:'t18', lang:'ar', lat:36.4560, lng:10.7350, wiki:'Nabeul',
+  name:'نابل', country:'تونس', author:'وليد من نابل', tag:'عاصمة الفخار وماء الزهر',
+  story:'الفخار المزوّق بالأزرق والأصفر يتصنع هوني من قرون، والسوق متاع الجمعة أكبر سوق فالجهة.\n\nفي أفريل، ريحة ماء الزهر تعمّر البلاد كاملة.',
+  tr:{ en:{ name:'Nabeul', country:'Tunisia', author:'Walid, from Nabeul', tag:'Capital of pottery and orange blossom water',
+      story:'Blue and yellow painted pottery has been made here for centuries, and the Friday market is the biggest in the region.\n\nIn April the smell of orange blossom fills the whole town.' },
+    it:{ name:'Nabeul', country:'Tunisia', author:'Walid, da Nabeul', tag:"Capitale della ceramica e dell'acqua di fiori d'arancio",
+      story:"Qui si dipinge ceramica blu e gialla da secoli, e il mercato del venerdì è il più grande della zona.\n\nAd aprile il profumo dei fiori d'arancio invade tutta la città." },
+    fr:{ name:'Nabeul', country:'Tunisie', author:'Walid, de Nabeul', tag:"Capitale de la poterie et de l'eau de fleur d'oranger",
+      story:"On y peint de la poterie bleue et jaune depuis des siècles, et le marché du vendredi est le plus grand de la région.\n\nEn avril, l'odeur de fleur d'oranger envahit toute la ville." } } },
+
+{ id:'t19', lang:'ar', lat:35.5040, lng:11.0620, wiki:'Mahdia',
+  name:'المهدية', country:'تونس', author:'سيف من المهدية', tag:'مدينة على لسان أرض، محاطة بالبحر من تلاث جيهات',
+  story:'باب سقيفة الكحلة يفتحلك على مدينة عتيقة صغيرة، وفآخرها المقبرة البحرية والبرج. الماء أزرق فاتح وصافي.\n\nهي أهدى من سوسة والحمامات بمرّات، والحوت فيها أطرى.',
+  tr:{ en:{ name:'Mahdia', country:'Tunisia', author:'Seif, from Mahdia', tag:'A town on a headland, sea on three sides',
+      story:'Skifa el Kahla opens onto a small medina that ends at the sea cemetery and the fort. The water is pale blue and clear.\n\nIt is far quieter than Sousse or Hammamet, and the fish is fresher.' },
+    it:{ name:'Mahdia', country:'Tunisia', author:'Seif, da Mahdia', tag:'Una città su un promontorio, mare su tre lati',
+      story:'Skifa el Kahla apre su una piccola medina che finisce al cimitero sul mare e al forte. L\u0027acqua è azzurra e limpida.\n\nÈ molto più tranquilla di Sousse o Hammamet, e il pesce è più fresco.' },
+    fr:{ name:'Mahdia', country:'Tunisie', author:'Seif, de Mahdia', tag:'Une ville sur une pointe, la mer sur trois côtés',
+      story:"Skifa el Kahla ouvre sur une petite médina qui finit au cimetière marin et au fort. L'eau est bleu clair et limpide.\n\nBien plus calme que Sousse ou Hammamet, et le poisson y est plus frais." } } },
+
+{ id:'t20', lang:'ar', lat:33.5440, lng:9.9700, wiki:'Matmata, Tunisia',
+  name:'مطماطة', country:'تونس', author:'نجيب من مطماطة', tag:'ديار محفورة تحت الأرض فالصحرا',
+  story:'حفرة كبيرة فالأرض، وحواليها بيوت محفورة فالحيط. البناية هاذي تخلي الصيف بارد والشتاء دافي.\n\nناس باقين ساكنين فيها بصح، موش متحف. اسأل قبل ما تصوّر.',
+  tr:{ en:{ name:'Matmata', country:'Tunisia', author:'Najib, from Matmata', tag:'Houses dug underground in the desert',
+      story:'A wide pit in the ground with rooms carved into its walls. The design keeps summers cool and winters warm.\n\nPeople still live in them — this is not a museum. Ask before you photograph.' },
+    it:{ name:'Matmata', country:'Tunisia', author:'Najib, da Matmata', tag:'Case scavate sottoterra nel deserto',
+      story:'Una grande fossa nel terreno con stanze scavate nelle pareti. Il sistema tiene fresco d\u0027estate e caldo d\u0027inverno.\n\nCi vive ancora gente: non è un museo. Chiedi prima di fotografare.' },
+    fr:{ name:'Matmata', country:'Tunisie', author:'Najib, de Matmata', tag:'Des maisons creusées sous terre dans le désert',
+      story:"Une large fosse dans le sol, avec des pièces creusées dans les parois. Le principe garde le frais l'été et le chaud l'hiver.\n\nDes gens y vivent encore : ce n'est pas un musée. Demande avant de photographier." } } },
+
+{ id:'t21', lang:'ar', lat:34.6900, lng:11.2100, wiki:'Kerkennah Islands',
+  name:'قرقنة', country:'تونس', author:'هيثم من صفاقس', tag:'جزر مسطحة، صيد بالشرفية، وهدوء تام',
+  story:'ما فماش لا مرتفعات لا فنادق كبار — نخل، ماء ضحل، وطريقة صيد قديمة بالجريد ما بقاتش كان هوني.\n\nالباخرة من صفاقس ساعة ونص. اجي وقت الغروب.',
+  tr:{ en:{ name:'Kerkennah Islands', country:'Tunisia', author:'Haythem, from Sfax', tag:'Flat islands, palm-frond fishing, total quiet',
+      story:'No hills, no big hotels — just palms, shallow water and an old fishing method with palm fronds that survives only here.\n\nThe ferry from Sfax takes ninety minutes. Come for sunset.' },
+    it:{ name:'Isole Kerkennah', country:'Tunisia', author:'Haythem, da Sfax', tag:'Isole piatte, pesca con le foglie di palma, silenzio totale',
+      story:'Niente colline, niente grandi alberghi — solo palme, acqua bassa e un antico metodo di pesca con le fronde, rimasto solo qui.\n\nIl traghetto da Sfax impiega un\u0027ora e mezza. Vieni al tramonto.' },
+    fr:{ name:'Îles Kerkennah', country:'Tunisie', author:'Haythem, de Sfax', tag:'Des îles plates, la pêche aux palmes, un calme total',
+      story:"Pas de collines, pas de grands hôtels — des palmiers, une eau basse et une pêche ancienne aux palmes qui ne survit qu'ici.\n\nLe bac depuis Sfax met une heure et demie. Viens au coucher du soleil." } } },
+
+{ id:'t22', lang:'ar', lat:34.3190, lng:7.9250, wiki:'Chebika',
+  name:'شبيكة', country:'تونس', author:'رانية من توزر', tag:'واحة جبلية وشلال فوسط الحجر',
+  story:'قرية قديمة مهجورة تحت الجبل، وممر ضيّق يوصلك لعين ماء وشلال صغير وسط النخل.\n\nكمّل لتمغزة وميداس فنفس النهار — الطريق بينهم خيالي.',
+  tr:{ en:{ name:'Chebika', country:'Tunisia', author:'Rania, from Tozeur', tag:'A mountain oasis and a waterfall in bare rock',
+      story:'An abandoned old village under the cliff, and a narrow gorge leading to a spring and a small waterfall among palms.\n\nDo Tamerza and Mides the same day — the road between them is unreal.' },
+    it:{ name:'Chebika', country:'Tunisia', author:'Rania, da Tozeur', tag:'Un\u0027oasi di montagna e una cascata nella roccia nuda',
+      story:'Un vecchio villaggio abbandonato sotto la rupe, e una gola stretta che porta a una sorgente e a una piccola cascata tra le palme.\n\nFai Tamerza e Mides lo stesso giorno: la strada è irreale.' },
+    fr:{ name:'Chebika', country:'Tunisie', author:'Rania, de Tozeur', tag:'Une oasis de montagne et une cascade dans la roche nue',
+      story:"Un vieux village abandonné sous la falaise, et une gorge étroite qui mène à une source et à une petite cascade au milieu des palmiers.\n\nFais Tamerza et Midès le même jour : la route est irréelle." } } },
+
+{ id:'t23', lang:'ar', lat:36.5580, lng:8.7540, wiki:'Bulla Regia',
+  name:'بلا ريجيا', country:'تونس', author:'منير من جندوبة', tag:'فيلات رومانية تحت الأرض، بفسيفساء باقية فبلاصتها',
+  story:'الرومان حفرو طابق تحتاني باش يهربو من السخانة. تنزل بالدرج وتلقى الفسيفساء باقية فأرضها من ألفين سنة.\n\nهي الموقع الوحيد فالدنيا اللي فيه هالبناية.',
+  tr:{ en:{ name:'Bulla Regia', country:'Tunisia', author:'Mounir, from Jendouba', tag:'Underground Roman villas with mosaics still in place',
+      story:'The Romans dug a lower floor to escape the heat. You walk down the stairs and the mosaics are still on the ground where they were laid.\n\nIt is the only site in the world built this way.' },
+    it:{ name:'Bulla Regia', country:'Tunisia', author:'Mounir, da Jendouba', tag:'Ville romane sotterranee con i mosaici ancora al loro posto',
+      story:'I Romani scavarono un piano interrato per sfuggire al caldo. Scendi le scale e i mosaici sono ancora sul pavimento dove furono posati.\n\nÈ l\u0027unico sito al mondo costruito così.' },
+    fr:{ name:'Bulla Regia', country:'Tunisie', author:'Mounir, de Jendouba', tag:'Des villas romaines souterraines, mosaïques encore en place',
+      story:"Les Romains ont creusé un étage enterré pour fuir la chaleur. Tu descends l'escalier et les mosaïques sont toujours au sol, là où on les a posées.\n\nC'est le seul site au monde bâti ainsi." } } },
+
+{ id:'i7', lang:'it', lat:41.8902, lng:12.4922, wiki:'Colosseum',
+  name:'Colosseo', country:'Italia', author:'Marco, da Roma', tag:"L'anfiteatro che ha dato la forma a tutti gli stadi",
+  story:'Cinquantamila spettatori, e sotto l\u0027arena un labirinto di gallerie e ascensori per le belve. Il biglietto vale anche per il Foro e il Palatino.\n\nPrenota online e entra alle 8:30, prima dei gruppi.',
+  tr:{ ar:{ name:'الكولوسيوم', country:'إيطاليا', author:'ماركو من روما', tag:'المدرج اللي عطى الشكل لكل الملاعب من بعدو',
+      story:'خمسين ألف متفرّج، وتحت الحلبة متاهة أنفاق ومصاعد للوحوش. التذكرة تخدم زادة للمنتدى والبالاتين.\n\nاحجز فالأنترنات وادخل الثمنية ونص، قبل الأفواج.' },
+    en:{ name:'Colosseum', country:'Italy', author:'Marco, from Rome', tag:'The amphitheatre every stadium since has copied',
+      story:'Fifty thousand spectators, and under the arena a maze of tunnels and lifts for the animals. The ticket covers the Forum and Palatine too.\n\nBook online and go in at 8:30, ahead of the tour groups.' },
+    fr:{ name:'Colisée', country:'Italie', author:'Marco, de Rome', tag:"L'amphithéâtre que tous les stades ont copié depuis",
+      story:"Cinquante mille spectateurs, et sous l'arène un labyrinthe de galeries et d'ascenseurs pour les fauves. Le billet couvre aussi le Forum et le Palatin.\n\nRéserve en ligne et entre à 8h30, avant les groupes." } } },
+
+{ id:'i8', lang:'it', lat:41.8986, lng:12.4769, wiki:'Pantheon, Rome',
+  name:'Pantheon', country:'Italia', author:'Marco, da Roma', tag:'La cupola in calcestruzzo più grande mai costruita, dal 126 d.C.',
+  story:'Nessuna finestra: la luce entra da un buco di nove metri nel soffitto e gira sulle pareti durante la giornata. È ancora la cupola non armata più grande del mondo.\n\nEntra quando piove — la pioggia cade dentro e scorre via dal pavimento.',
+  tr:{ ar:{ name:'البانثيون', country:'إيطاليا', author:'ماركو من روما', tag:'أكبر قبة إسمنتية اتبنات فالتاريخ، من سنة 126',
+      story:'ما فماش شبابك: الضو يدخل من ثقب تسع أمتار فالسقف ويدور على الحيوط طول النهار. باقية أكبر قبة بلا حديد فالدنيا.\n\nادخل وقت المطر — الما ينزل للداخل ويهرب من الأرضية.' },
+    en:{ name:'Pantheon', country:'Italy', author:'Marco, from Rome', tag:'The largest concrete dome ever built, from AD 126',
+      story:'No windows: light falls through a nine-metre hole in the ceiling and travels across the walls all day. It is still the largest unreinforced dome on earth.\n\nGo in when it rains — the rain falls inside and drains through the floor.' },
+    fr:{ name:'Panthéon', country:'Italie', author:'Marco, de Rome', tag:'La plus grande coupole en béton jamais bâtie, de 126 apr. J.-C.',
+      story:"Aucune fenêtre : la lumière tombe par un trou de neuf mètres dans le plafond et se déplace sur les murs toute la journée. C'est encore la plus grande coupole non armée au monde.\n\nEntre quand il pleut — la pluie tombe à l'intérieur et s'évacue par le sol." } } },
+
+{ id:'i9', lang:'it', lat:43.7731, lng:11.2560, wiki:'Florence Cathedral',
+  name:'Duomo di Firenze', country:'Italia', author:'Chiara, da Firenze', tag:'La cupola che nessuno sapeva come costruire',
+  story:'Brunelleschi la tirò su senza centine, con una doppia calotta e mattoni a spina di pesce. Nessuno prima ci era riuscito.\n\nSali i 463 gradini: si passa fra le due cupole, e in cima c\u0027è tutta la Toscana.',
+  tr:{ ar:{ name:'كاتدرائية فلورنسا', country:'إيطاليا', author:'كيارا من فلورنسا', tag:'القبة اللي حتى حد ما كانش يعرف كيفاش تتبنى',
+      story:'برونيليسكي بناها بلا هيكل خشبي، بقشرتين وطوب مركّب بطريقة خاصة. حتى واحد قبلو ما نجّم.\n\nاطلع 463 درجة: تعدّي بين القبتين، وفالقمة تشوف توسكانا كاملة.' },
+    en:{ name:'Florence Cathedral', country:'Italy', author:'Chiara, from Florence', tag:'The dome nobody knew how to build',
+      story:'Brunelleschi raised it without wooden centring, using a double shell and herringbone brickwork. Nobody had managed it before.\n\nClimb the 463 steps: you pass between the two shells, and the top gives you all of Tuscany.' },
+    fr:{ name:'Cathédrale de Florence', country:'Italie', author:'Chiara, de Florence', tag:'La coupole que personne ne savait construire',
+      story:"Brunelleschi l'a montée sans cintre en bois, avec une double coque et des briques en arête de poisson. Personne n'y était arrivé avant.\n\nMonte les 463 marches : on passe entre les deux coques, et au sommet il y a toute la Toscane." } } },
+
+{ id:'i10', lang:'it', lat:45.4341, lng:12.3388, wiki:"St Mark's Square",
+  name:'Piazza San Marco', country:'Italia', author:'Elena, da Venezia', tag:'Il salotto di Venezia, e il punto più basso della città',
+  story:'La basilica è oro bizantino dentro, il campanile dà la vista migliore sulla laguna. Con l\u0027acqua alta la piazza si allaga per prima.\n\nVieni alle sette del mattino: è vuota, e le luci si riflettono sul marmo bagnato.',
+  tr:{ ar:{ name:'ساحة سان ماركو', country:'إيطاليا', author:'إيلينا من البندقية', tag:'صالون البندقية، وأوطى نقطة فالمدينة',
+      story:'الكنيسة من الداخل ذهب بيزنطي، والبرج يعطيك أحسن منظر على البحيرة. كي يطلع الماء، الساحة هي أول اللي تغرق.\n\nاجي السبعة متاع الصباح: خالية، والأضواء تنعكس على الرخام المبلول.' },
+    en:{ name:"St Mark's Square", country:'Italy', author:'Elena, from Venice', tag:'Venice\u0027s drawing room, and the lowest point in the city',
+      story:'The basilica is Byzantine gold inside; the campanile gives the best view over the lagoon. When the tide rises, this square floods first.\n\nCome at seven in the morning: empty, with the lights reflecting off wet marble.' },
+    fr:{ name:'Place Saint-Marc', country:'Italie', author:'Elena, de Venise', tag:'Le salon de Venise, et le point le plus bas de la ville',
+      story:"La basilique, c'est de l'or byzantin à l'intérieur ; le campanile offre la meilleure vue sur la lagune. À marée haute, la place est la première inondée.\n\nViens à sept heures du matin : vide, avec les lumières qui se reflètent sur le marbre mouillé." } } },
+
+{ id:'i11', lang:'it', lat:45.4642, lng:9.1900, wiki:'Milan Cathedral',
+  name:'Duomo di Milano', country:'Italia', author:'Andrea, da Milano', tag:'Sei secoli di cantiere e 3.400 statue',
+  story:'Marmo di Candoglia, guglie ovunque, e un tetto su cui si cammina davvero. Dall\u0027alto, nelle giornate limpide, si vedono le Alpi.\n\nSali a piedi invece che in ascensore: costa meno e vedi meglio i dettagli.',
+  tr:{ ar:{ name:'كاتدرائية ميلانو', country:'إيطاليا', author:'أندريا من ميلانو', tag:'ستة قرون بناء و3400 تمثال',
+      story:'رخام أبيض، أبراج صغيرة فكل بلاصة، وسطح تمشي عليه بصح. فالنهارات الصافية تشوف الألب من فوق.\n\nاطلع على رجليك موش بالمصعد: أرخص وتشوف التفاصيل أحسن.' },
+    en:{ name:'Milan Cathedral', country:'Italy', author:'Andrea, from Milan', tag:'Six centuries of building and 3,400 statues',
+      story:'Candoglia marble, spires everywhere, and a roof you can actually walk on. On clear days you can see the Alps from up there.\n\nTake the stairs instead of the lift: cheaper, and you see the detail better.' },
+    fr:{ name:'Duomo de Milan', country:'Italie', author:'Andrea, de Milan', tag:'Six siècles de chantier et 3 400 statues',
+      story:"Du marbre de Candoglia, des flèches partout, et un toit sur lequel on marche vraiment. Par temps clair, on voit les Alpes de là-haut.\n\nPrends l'escalier plutôt que l'ascenseur : moins cher, et on voit mieux les détails." } } },
+
+{ id:'i12', lang:'it', lat:40.7497, lng:14.4869, wiki:'Pompeii',
+  name:'Pompei', country:'Italia', author:'Ciro, da Napoli', tag:'Una città romana fermata in un giorno del 79 d.C.',
+  story:'Strade con i solchi dei carri, panetterie con il pane ancora nel forno, case con gli affreschi intatti. Non è una rovina: è una città.\n\nSono 44 ettari. Porta acqua, cappello, e scegli prima cosa vuoi vedere.',
+  tr:{ ar:{ name:'بومبي', country:'إيطاليا', author:'تشيرو من نابولي', tag:'مدينة رومانية توقفت فنهار واحد سنة 79',
+      story:'شوارع فيها آثار عجلات الكروسة، مخابز بالخبز باقي فالفرن، وديار برسومات سالمة. موش خربة — مدينة.\n\n44 هكتار. خوذ ماء وشابو، واختار قبل شنوّة تحب تشوف.' },
+    en:{ name:'Pompeii', country:'Italy', author:'Ciro, from Naples', tag:'A Roman city stopped on a single day in AD 79',
+      story:'Streets rutted by cart wheels, bakeries with bread still in the oven, houses with frescoes intact. It is not a ruin: it is a city.\n\nIt covers 44 hectares. Bring water and a hat, and decide beforehand what you want to see.' },
+    fr:{ name:'Pompéi', country:'Italie', author:'Ciro, de Naples', tag:'Une ville romaine arrêtée en un seul jour, en 79',
+      story:"Des rues creusées par les roues des charrettes, des boulangeries avec le pain encore au four, des maisons aux fresques intactes. Ce n'est pas une ruine : c'est une ville.\n\n44 hectares. Prends de l'eau, un chapeau, et choisis à l'avance ce que tu veux voir." } } },
+
+{ id:'i13', lang:'it', lat:40.6280, lng:14.4850, wiki:'Positano',
+  name:'Positano', country:'Italia', author:'Anna, dalla Costiera', tag:'Case a gradoni che scendono dritte nel mare',
+  story:'Un paese verticale: tutto è scale, e si arriva alla spiaggia sempre scendendo. La cupola di maiolica gialla e verde si vede da lontano.\n\nMeglio maggio o settembre. In agosto la strada costiera è ferma.',
+  tr:{ ar:{ name:'بوزيتانو', country:'إيطاليا', author:'آنّا من ساحل أمالفي', tag:'ديار مدرّجة تنزل ديركت للبحر',
+      story:'بلاد عمودية: كل شي درج، وللشط ديما تنزل. قبة الخزف الصفرا والخضرا تشوفها من بعيد.\n\nأحسن وقت ماي ولا سبتمبر. فأوت، طريق الساحل واقفة.' },
+    en:{ name:'Positano', country:'Italy', author:'Anna, from the Amalfi Coast', tag:'Stacked houses dropping straight into the sea',
+      story:'A vertical town: everything is stairs, and you always reach the beach going down. The yellow and green majolica dome is visible from far off.\n\nMay or September are best. In August the coast road does not move.' },
+    fr:{ name:'Positano', country:'Italie', author:'Anna, de la côte amalfitaine', tag:'Des maisons empilées qui tombent droit dans la mer',
+      story:"Un village vertical : tout est escalier, et on rejoint toujours la plage en descendant. Le dôme de majolique jaune et verte se voit de loin.\n\nMai ou septembre. En août, la route côtière n'avance plus." } } },
+
+{ id:'i14', lang:'it', lat:43.3181, lng:11.3316, wiki:'Piazza del Campo',
+  name:'Piazza del Campo, Siena', country:'Italia', author:'Chiara, da Firenze', tag:'La piazza a conchiglia dove si corre il Palio',
+  story:'Inclinata, in mattoni rossi, divisa in nove spicchi. Due volte l\u0027anno diventa una pista e dieci cavalli la girano in novanta secondi.\n\nSiediti per terra come fanno tutti e guarda la Torre del Mangia.',
+  tr:{ ar:{ name:'ساحة الكامبو، سيينا', country:'إيطاليا', author:'كيارا من فلورنسا', tag:'الساحة على شكل صدفة، وين يتعمل سباق الباليو',
+      story:'مايلة، بالطوب الأحمر، مقسّمة على تسعة. مرّتين فالعام تولي حلبة وعشرة خيول يدورو فيها فتسعين ثانية.\n\nاقعد على الأرض كيما الكل وتفرّج فالبرج.' },
+    en:{ name:'Piazza del Campo, Siena', country:'Italy', author:'Chiara, from Florence', tag:'The shell-shaped square where the Palio is run',
+      story:'Sloped, in red brick, divided into nine segments. Twice a year it becomes a racetrack and ten horses go round it in ninety seconds.\n\nSit on the ground like everyone does and look up at the Torre del Mangia.' },
+    fr:{ name:'Piazza del Campo, Sienne', country:'Italie', author:'Chiara, de Florence', tag:'La place en coquille où se court le Palio',
+      story:"Inclinée, en brique rouge, divisée en neuf parts. Deux fois par an elle devient une piste et dix chevaux en font le tour en quatre-vingt-dix secondes.\n\nAssieds-toi par terre comme tout le monde et regarde la Torre del Mangia." } } },
+
+{ id:'i15', lang:'it', lat:40.7830, lng:17.2370, wiki:'Alberobello',
+  name:'Alberobello', country:'Italia', author:'Pietro, dalla Puglia', tag:'Millecinquecento case coniche di pietra a secco',
+  story:'I trulli sono costruiti senza malta: pietra su pietra, tetto a cono con un pinnacolo. Una volta si smontavano in fretta per non pagare le tasse.\n\nSali a Rione Aia Piccola: meno negozi, più case vere.',
+  tr:{ ar:{ name:'ألبيروبيلّو', country:'إيطاليا', author:'بييترو من بوليا', tag:'ألف وخمسمية دار مخروطية بحجر بلا إسمنت',
+      story:'الترولي مبنيين حجر على حجر بلا مونة، بسقف مخروطي. قديم كانو يفكّوهم بسرعة باش ما يخلّصوش الضريبة.\n\nاطلع لحومة آيا بيكولا: حوانت أقل وديار حقيقية أكثر.' },
+    en:{ name:'Alberobello', country:'Italy', author:'Pietro, from Puglia', tag:'Fifteen hundred cone-roofed drystone houses',
+      story:'Trulli are built without mortar: stone on stone, a conical roof with a pinnacle on top. They were once dismantled fast to dodge taxes.\n\nWalk up to Rione Aia Piccola: fewer shops, more real houses.' },
+    fr:{ name:'Alberobello', country:'Italie', author:'Pietro, des Pouilles', tag:'Mille cinq cents maisons coniques en pierre sèche',
+      story:"Les trulli sont bâtis sans mortier : pierre sur pierre, toit conique avec un pinacle. On les démontait vite autrefois pour échapper à l'impôt.\n\nMonte au Rione Aia Piccola : moins de boutiques, plus de vraies maisons." } } },
+
+{ id:'i16', lang:'it', lat:37.8516, lng:15.2853, wiki:'Taormina',
+  name:'Taormina', country:'Italia', author:'Rosario, da Palermo', tag:'Un teatro greco con l\u0027Etna sullo sfondo',
+  story:'Il teatro è scavato nella collina e la scena si apre sul vulcano e sul mare. D\u0027estate ci si fanno ancora concerti.\n\nScendi a Isola Bella con la funivia, e lascia la macchina fuori: il centro è chiuso.',
+  tr:{ ar:{ name:'تاورمينا', country:'إيطاليا', author:'روزاريو من باليرمو', tag:'مسرح يوناني وفخلفيتو بركان إتنا',
+      story:'المسرح محفور فالجبل، والخشبة تفتح على البركان والبحر. فالصيف باقي يتعملو فيه حفلات.\n\nانزل لإيزولا بيلّا بالتلفريك، وخلّي الكرهبة برّا: الوسط مسكّر.' },
+    en:{ name:'Taormina', country:'Italy', author:'Rosario, from Palermo', tag:'A Greek theatre with Etna as the backdrop',
+      story:'The theatre is cut into the hillside and the stage opens onto the volcano and the sea. Concerts are still held there in summer.\n\nTake the cable car down to Isola Bella, and leave the car outside: the centre is closed.' },
+    fr:{ name:'Taormine', country:'Italie', author:'Rosario, de Palerme', tag:"Un théâtre grec avec l'Etna en fond de scène",
+      story:"Le théâtre est taillé dans la colline et la scène s'ouvre sur le volcan et la mer. L'été, on y donne encore des concerts.\n\nDescends à Isola Bella en téléphérique, et laisse la voiture dehors : le centre est fermé." } } },
+
+{ id:'i17', lang:'it', lat:46.6180, lng:12.3050, wiki:'Tre Cime di Lavaredo',
+  name:'Tre Cime di Lavaredo', country:'Italia', author:'Luca, da Bolzano', tag:'Tre torri di dolomia che si girano a piedi',
+  story:'Il giro è di dieci chilometri, quasi in piano, e le cime cambiano forma a ogni curva. Al tramonto la roccia diventa rosa.\n\nDa giugno a ottobre. La strada a pedaggio si chiude presto quando nevica.',
+  tr:{ ar:{ name:'تري تشيمي دي لافاريدو', country:'إيطاليا', author:'لوكا من بولزانو', tag:'تلاثة أبراج حجرية تدور حواليهم على رجليك',
+      story:'الدورة عشر كيلومترات تقريبا مسطحة، والقمم يتبدّل شكلهم فكل منعرج. وقت الغروب الحجر يولي وردي.\n\nمن جوان لأكتوبر. الطريق تتسكّر بكري كي ينزل الثلج.' },
+    en:{ name:'Tre Cime di Lavaredo', country:'Italy', author:'Luca, from Bolzano', tag:'Three dolomite towers you can walk right around',
+      story:'The loop is ten kilometres and nearly flat, and the peaks change shape at every bend. At sunset the rock turns pink.\n\nJune to October. The toll road closes early once the snow comes.' },
+    fr:{ name:'Tre Cime di Lavaredo', country:'Italie', author:'Luca, de Bolzano', tag:'Trois tours de dolomie dont on fait le tour à pied',
+      story:"La boucle fait dix kilomètres, presque plate, et les sommets changent de forme à chaque virage. Au coucher du soleil, la roche vire au rose.\n\nDe juin à octobre. La route à péage ferme tôt dès la neige." } } },
+
+{ id:'i18', lang:'it', lat:45.9850, lng:9.2620, wiki:'Bellagio',
+  name:'Bellagio, Lago di Como', country:'Italia', author:'Sofia, da Como', tag:'Il paese sulla punta fra i due rami del lago',
+  story:'Scalinate strette fra le case, ville con giardini che scendono all\u0027acqua, e montagne su tutti e tre i lati.\n\nMuoviti in battello invece che in macchina: la strada del lago è stretta e sempre intasata.',
+  tr:{ ar:{ name:'بيلاّجو، بحيرة كومو', country:'إيطاليا', author:'صوفيا من كومو', tag:'البلاد اللي على الرأس بين فرعي البحيرة',
+      story:'درج ضيّق بين الديار، فيلات بجناين تنزل للماء، وجبال من التلاث جيهات.\n\nتحرّك بالباخرة موش بالكرهبة: طريق البحيرة ضيقة وديما مزحومة.' },
+    en:{ name:'Bellagio, Lake Como', country:'Italy', author:'Sofia, from Como', tag:'The town on the point between the lake\u0027s two arms',
+      story:'Narrow stairways between the houses, villas with gardens running down to the water, and mountains on three sides.\n\nGet around by boat rather than car: the lake road is narrow and always jammed.' },
+    fr:{ name:'Bellagio, lac de Côme', country:'Italie', author:'Sofia, de Côme', tag:'Le village sur la pointe entre les deux bras du lac',
+      story:"Des escaliers étroits entre les maisons, des villas aux jardins qui descendent jusqu'à l'eau, et des montagnes sur trois côtés.\n\nDéplace-toi en bateau plutôt qu'en voiture : la route du lac est étroite et toujours bouchée." } } }
+];
+SEED.push(...BULK_PLACES);
+
+
+/* ---------- photos pulled from Wikipedia when nobody uploaded one ---------- */
+const photoCache = {};
+const SKIP = /(icon|logo|flag|coat[_ ]of[_ ]arms|\bmap\b|blank|commons|wiki|edit|symbol|location|stub|question|ambox|arrow|star|disambig|padlock)/i;
+const OKMIME = /^image\/(jpeg|png|webp)$/;
+
+// only keep a url once the browser has actually decoded it
+function loadable(src){
+  return new Promise(res => {
+    const im = new Image();
+    im.onload  = () => res(im.naturalWidth >= 200);
+    im.onerror = () => res(false);
+    im.src = src;
+  });
+}
+
+async function candidates(raw){
+  const out = [];
+  // 1) let MediaWiki build the thumbnail — it clamps to the original width,
+  //    so the url is always one that exists (hand-made widths 404).
+  try{
+    const r = await fetch('https://' + (raw.host || 'en') + '.wikipedia.org/w/api.php'
+      + '?action=query&format=json&origin=*&generator=images&gimlimit=25'
+      + '&prop=imageinfo&iiprop=url|mime&iiurlwidth=1000&titles='
+      + encodeURIComponent(raw.wiki));
+    const j = await r.json();
+    Object.values((j.query && j.query.pages) || {}).forEach(pg => {
+      const ii = pg.imageinfo && pg.imageinfo[0];
+      if(!ii || !OKMIME.test(ii.mime || '')) return;
+      if(SKIP.test(pg.title || '')) return;
+      if(ii.thumburl) out.push(ii.thumburl);
+      else if(ii.url) out.push(ii.url);
+    });
+  }catch(e){}
+  // 2) fallback: whatever the page preview offers, untouched
+  if(!out.length){
+    try{
+      const r = await fetch('https://' + (raw.host || 'en') + '.wikipedia.org/w/api.php'
+        + '?action=query&prop=pageimages&format=json&pithumbsize=1000&origin=*&titles='
+        + encodeURIComponent(raw.wiki));
+      const j = await r.json();
+      const pg = Object.values(j.query.pages)[0];
+      if(pg && pg.thumbnail) out.push(pg.thumbnail.source);
+    }catch(e){}
+  }
+  return out;
+}
+
+async function wikiPhotos(raw){
+  if(photoCache[raw.id]) return photoCache[raw.id];
+  photoCache[raw.id] = [];
+  if(!raw.wiki) return [];
+  const cands = (await candidates(raw)).slice(0, 14);
+  const ok = await Promise.all(cands.map(loadable));
+  photoCache[raw.id] = cands.filter((_, i) => ok[i]).slice(0, 5);
+  return photoCache[raw.id];
+}
+
+let hydrateT;
+async function hydratePhotos(){
+  const todo = places.filter(p => p.wiki && !(p.photos && p.photos.length) && !p.wikiPhotos);
+  const got = await Promise.all(todo.map(async raw => {
+    const list = await wikiPhotos(raw);
+    if(list.length){ raw.wikiPhotos = list; raw.wikiPhoto = list[0]; return true; }
+    return false;
+  }));
+  if(got.some(Boolean)){
+    clearTimeout(hydrateT);
+    hydrateT = setTimeout(() => {
+      render();
+      if(activeId && $('detail').classList.contains('on')) fillDetail(activeId);
+    }, 120);
+  }
+}
+
+/* ============================================================
+   Every town, from Wikipedia's geosearch — instead of a hand-written list.
+   Curated places (with a local's story) stay in `places`;
+   whatever the map is showing gets filled in from `found`, in memory only.
+   ============================================================ */
+let found = [];
+let discoverT = null;
+const summaryCache = {};
+
+function allPlaces(){
+  return places.filter(p => (p.status || 'approved') === 'approved').concat(found);
+}
+
+async function discover(){
+  if(map.getZoom() < 10){
+    if(found.length){ found = []; render(); }
+    return;
+  }
+  const c = map.getCenter();
+  const host = lang + '.wikipedia.org';
+  try{
+    const r = await fetch('https://' + host + '/w/api.php?action=query&format=json&origin=*'
+      + '&list=geosearch&gsradius=10000&gslimit=60&gsprimary=primary'
+      + '&gscoord=' + c.lat + '%7C' + c.lng);
+    const j = await r.json();
+    const hits = (j.query && j.query.geosearch) || [];
+    const mine = new Set();
+    places.forEach(pl => {
+      const names = [pl.name].concat(pl.tr ? Object.values(pl.tr).map(t => t && t.name) : []);
+      names.forEach(nm => nm && mine.add(nm.toLowerCase()));
+    });
+    found = hits
+      .filter(it => !mine.has(it.title.toLowerCase()))
+      .map(it => ({
+        id:'w' + it.pageid, discovered:true, host:lang, wiki:it.title, lang,
+        name:it.title, country:'', tag:'', story:'', author:'Wikipedia',
+        lat:it.lat, lng:it.lon
+      }));
+    render();
+  }catch(e){}
+}
+function scheduleDiscover(){
+  clearTimeout(discoverT);
+  discoverT = setTimeout(discover, 450);
+}
+
+// text + photo for a discovered place, fetched only when it is opened
+async function loadSummary(raw){
+  if(raw.story) return;
+  const key = raw.host + ':' + raw.wiki;
+  if(summaryCache[key]){ Object.assign(raw, summaryCache[key]); return; }
+  try{
+    const r = await fetch('https://' + raw.host + '.wikipedia.org/api/rest_v1/page/summary/'
+      + encodeURIComponent(raw.wiki.replace(/ /g, '_')));
+    const j = await r.json();
+    const data = {
+      tag: j.description || '',
+      story: j.extract || '',
+      country: (j.description || '').split(',').pop().trim()
+    };
+    if(j.thumbnail && j.thumbnail.source) data.wikiPhoto = j.thumbnail.source;
+    summaryCache[key] = data;
+    Object.assign(raw, data);
+  }catch(e){}
+}
+
+/* ---------- language state ---------- */
+let lang = 'ar';
+let T = L10N.ar;
+
+function view(p){
+  const tr = p.tr && p.tr[lang];
+  const translated = !!tr || p.lang === lang;
+  return {
+    ...p,
+    name: (tr && tr.name) || p.name,
+    country: (tr && tr.country) || p.country,
+    author: (tr && tr.author) || p.author,
+    tag: (tr && tr.tag) || p.tag,
+    story: (tr && tr.story) || p.story,
+    shot: (p.photos && p.photos[0]) || p.wikiPhoto || null,
+    translated
+  };
+}
+
+function applyLang(code){
+  lang = code;
+  T = Object.assign({}, L10N[code], overrides[code] || {});
+  document.documentElement.lang = code;
+  document.documentElement.dir = T.dir;
+  document.body.dir = T.dir;
+  $('brandName').textContent = settings.brand || T.brand;
+  $('brandSub').textContent = settings.sub;
+
+
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = T[el.dataset.i18n] || '';
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+    el.placeholder = T[el.dataset.i18nPh] || '';
+  });
+  $('fLocLabel').textContent = draft.lat === null ? T.noLoc
+    : (draft.src === 'me' ? T.yourLoc : T.pickedLoc);
+  document.querySelectorAll('#langs button').forEach(b => {
+    b.classList.toggle('on', b.dataset.lang === code);
+  });
+
+  renderReasons();
+  renderSite();
+  found = [];
+  scheduleDiscover();
+  applyEditLabels();
+  validate();
+  render();
+  renderAdmin();
+  if(activeId && $('detail').classList.contains('on')) fillDetail(activeId);
+  if($('report').classList.contains('on')){
+    if(reportCtx.reportId) renderThread(); else $('reportHead').textContent = T.reportTitle;
+  }
+  db.set('masalek:lang', code);
+}
+
+/* ---------- storage ---------- */
+// window.storage works inside the Claude preview; localStorage works when the
+// file is opened directly or hosted. Memory only if both are unavailable.
+const mem = {};
+const db = {
+  async get(k){
+    try{ const r = await window.storage.get(k); if(r && r.value) return r.value; }catch(e){}
+    try{ const v = localStorage.getItem(k); if(v) return v; }catch(e){}
+    return mem[k] || null;
+  },
+  async set(k, v){
+    mem[k] = v;
+    try{ await window.storage.set(k, v); }catch(e){}
+    try{ localStorage.setItem(k, v); }catch(e){}
+  }
+};
+
+const KEY = 'masalek:places:v2';
+const store = {
+  cache:null,
+  async load(){
+    try{ const v = await db.get(KEY); this.cache = v ? JSON.parse(v) : null; }
+    catch(e){ this.cache = null; }
+    if(!Array.isArray(this.cache) || !this.cache.length){
+      this.cache = SEED.slice();
+      this.save();
+    }
+    return this.cache;
+  },
+  async save(){
+    await db.set(KEY, JSON.stringify(this.cache.map(p => {
+      const c = Object.assign({}, p); delete c.wikiPhoto; delete c.wikiPhotos; return c;
+    })));
+  }
+};
+
+/* ---------- reports store ---------- */
+const DEFAULT_CODE = '2468';       // مؤقت — Supabase Auth يعوّضو
+let settings = { brand:'', sub:'Masalek', lat:34.6, lng:9.6, zoom:6,
+                 code:DEFAULT_CODE, minDist:200, basemap:'green' };
+let overrides = {};                // تصليحات نصوص الواجهة، لكل لغة
+let strFilter = '';
+const RKEY = 'masalek:reports:v1';
+const rstore = {
+  cache:[],
+  async load(){
+    try{ const v = await db.get(RKEY); this.cache = v ? JSON.parse(v) : []; }
+    catch(e){ this.cache = []; }
+    if(!Array.isArray(this.cache)) this.cache = [];
+    return this.cache;
+  },
+  async save(){
+    await db.set(RKEY, JSON.stringify(this.cache));
+  }
+};
+
+let deviceId = 'd0';
+async function initDevice(){
+  const v = await db.get('masalek:device');
+  if(v){ deviceId = v; return; }
+  deviceId = 'd' + Math.random().toString(36).slice(2,10);
+  await db.set('masalek:device', deviceId);
+}
+
+let saveT;
+function saveSite(){
+  clearTimeout(saveT);
+  saveT = setTimeout(() => {
+    db.set('masalek:settings', JSON.stringify(settings));
+    db.set('masalek:i18n', JSON.stringify(overrides));
+  }, 400);
+}
+
+const REASONS = ['reasonWrong','reasonFake','reasonOffensive','reasonPhotos','reasonOther'];
+
+/* ---------- geo helpers ---------- */
+const R = 6371;
+const rad = d => d*Math.PI/180;
+function distanceKm(a,b,c,d){
+  const dLat = rad(c-a), dLng = rad(d-b);
+  const h = Math.sin(dLat/2)**2 + Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+function bearing(a,b,c,d){
+  const y = Math.sin(rad(d-b))*Math.cos(rad(c));
+  const x = Math.cos(rad(a))*Math.sin(rad(c)) - Math.sin(rad(a))*Math.cos(rad(c))*Math.cos(rad(d-b));
+  return (Math.atan2(y,x)*180/Math.PI + 360) % 360;
+}
+function fmtDist(km){
+  if(km < 1) return Math.round(km*1000) + ' ' + T.m;
+  if(km < 10) return km.toFixed(1) + ' ' + T.km;
+  return Math.round(km) + ' ' + T.km;
+}
+
+/* ---------- contour placeholder ---------- */
+function contour(seedText, w, h){
+  let s = 0;
+  for(let i=0;i<seedText.length;i++) s = (s*31 + seedText.charCodeAt(i)) % 100000;
+  const rnd = () => (s = (s*9301 + 49297) % 233280) / 233280;
+  const cx = w*(.3+rnd()*.4), cy = h*(.3+rnd()*.4);
+  let paths = '';
+  for(let r=6; r<Math.max(w,h)*.95; r+=Math.max(7, w*.09)){
+    let d = '';
+    for(let a=0; a<=360; a+=18){
+      const wob = 1 + (rnd()-.5)*.34;
+      d += (a===0?'M':'L') + (cx + Math.cos(rad(a))*r*wob).toFixed(1) + ' '
+                           + (cy + Math.sin(rad(a))*r*wob*.72).toFixed(1);
+    }
+    paths += '<path d="'+d+'Z" fill="none" stroke="#35f09a" stroke-opacity="'
+           + (.42 - r/(w*3.4)).toFixed(2) + '" stroke-width="1"/>';
+  }
+  return '<svg viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg">'
+       + '<rect width="'+w+'" height="'+h+'" fill="#07361f"/>'+paths+'</svg>';
+}
+
+/* ---------- map ---------- */
+const WORLD = L.latLngBounds([[-85, -180], [85, 180]]);
+const map = L.map('map', {
+  zoomControl:false,
+  worldCopyJump:false,
+  maxBounds:WORLD,
+  maxBoundsViscosity:1
+}).setView([34.6, 9.6], 6);
+
+/* Three basemaps, switchable from the admin panel:
+     green   — plain OpenStreetMap, inverted in CSS. Rock solid, never needs a key.
+               Labels are in each country's own script.
+     english — Wikimedia's osm-intl, same look, all labels in English, but the
+               service goes down sometimes.
+     grey    — Esri dark canvas, English labels, already dark. */
+const OSM_PLAIN = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const OSM_INTL  = 'https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png?lang=en';
+const esri = u => 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/'
+  + u + '/MapServer/tile/{z}/{y}/{x}';
+
+const tiles = L.tileLayer(OSM_PLAIN, {
+  maxZoom:19, noWrap:true, bounds:WORLD,
+  attribution:'&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+let esriLabels = null;
+function dropEsri(){
+  if(esriLabels){ map.removeLayer(esriLabels); esriLabels = null; }
+}
+function setBasemap(kind){
+  if(kind === 'grey'){
+    document.body.classList.add('darkbase');
+    tiles.setUrl(esri('World_Dark_Gray_Base'));
+    if(!esriLabels){
+      esriLabels = L.tileLayer(esri('World_Dark_Gray_Reference'),
+        { maxZoom:19, maxNativeZoom:16, noWrap:true, bounds:WORLD, pane:'overlayPane' })
+        .addTo(map);
+    }
+    return;
+  }
+  dropEsri();
+  document.body.classList.remove('darkbase');
+  tiles.setUrl(kind === 'english' ? OSM_INTL : OSM_PLAIN);
+}
+
+/* If the English tiles are picked and the service is down, come back to plain
+   OSM instead of leaving a blank screen. */
+let tilesOK = false, tileFails = 0;
+tiles.on('tileload', () => { tilesOK = true; });
+tiles.on('tileerror', () => {
+  if(tilesOK || settings.basemap !== 'english') return;
+  if(++tileFails >= 12){ settings.basemap = 'green'; setBasemap('green'); renderSite(); }
+});
+
+// never let the viewport get wider or taller than one world
+function clampZoom(){
+  const z = map.getBoundsZoom(WORLD, true);
+  map.setMinZoom(z);
+  if(map.getZoom() < z) map.setZoom(z);
+}
+clampZoom();
+window.addEventListener('resize', clampZoom);
+map.on('moveend zoomend', () => scheduleDiscover());
+
+const pinIcon = (active, dim) => L.divIcon({
+  className:'', iconSize:[26,26], iconAnchor:[13,13],
+  html:'<div class="pin'+(active?' is-active':'')+(dim?' dim':'')+'"><b></b><i></i></div>'
+});
+const meIcon = L.divIcon({
+  className:'', iconSize:[34,34], iconAnchor:[17,17],
+  html:'<div class="me"><b></b><i></i></div>'
+});
+
+/* ---------- state ---------- */
+let places = [], me = null, meMarker = null, markers = {}, activeId = null, pickMode = false;
+let draft = { lat:null, lng:null, src:null, photos:[] };
+let reports = [], isAdmin = false, adminTab = 'req', query = '';
+let editId = null, delArmed = false, gallery = [], lbIndex = 0;
+let accCircle = null, watchId = null, bestAcc = Infinity, pickTarget = 'place';
+let reportCtx = { placeId:null, reportId:null, asAdmin:false, reason:null };
+const $ = id => document.getElementById(id);
+const listEl = $('list');
+
+function esc(s){
+  return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+/* ---------- render ---------- */
+function render(){
+  const live = allPlaces();
+  const q = query.trim().toLowerCase();
+  const hit = (raw, p) => !q || [p.name, p.country, p.tag, p.story, raw.name, raw.country]
+    .some(v => v && String(v).toLowerCase().includes(q));
+  const rows = live.map(raw => ({ raw, v:view(raw) })).filter(o => hit(o.raw, o.v)).map(({v:p}) => ({
+    ...p,
+    d: me ? distanceKm(me.lat, me.lng, p.lat, p.lng) : null,
+    b: me ? bearing(me.lat, me.lng, p.lat, p.lng) : null
+  }));
+  if(me) rows.sort((a,b) => a.d - b.d);
+
+  $('listTitle').textContent = q ? T.resultsFor : me ? T.nearYou : T.onMap;
+  $('listCount').textContent = String(rows.length).padStart(2,'0');
+  $('listBtnCount').textContent = rows.length;
+
+  if(!rows.length){
+    listEl.innerHTML = q
+      ? '<div class="empty">'+esc(T.noResults)+'</div>'
+      : map.getZoom() < 10
+        ? '<div class="zoomhint">'+esc(T.zoomIn)+'</div>'
+        : '<div class="empty"><strong>'+esc(T.emptyT)+'</strong>'+esc(T.emptyB)+'</div>';
+  } else {
+    listEl.innerHTML = rows.map(p =>
+      '<button class="card' + (p.discovered ? ' wiki' : '') + '" data-id="'+p.id+'">'
+      + '<span class="thumb">'
+      + (p.shot
+          ? '<img src="'+p.shot+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+          : contour(p.id+p.name, 88, 88))
+      + '</span>'
+      + '<span class="card-body"><h3>'+esc(p.name)
+      + (p.discovered ? '<span class="wikipill">'+esc(T.discovered)+'</span>' : '')
+      + '</h3><p>'+esc(p.tag || p.story || '')+'</p></span>'
+      + '<span class="meta">'
+      + (p.d !== null
+          ? '<svg class="bearing" viewBox="0 0 24 24" style="transform:rotate('+p.b+'deg)">'
+            + '<path d="M12 3l7 17-7-4-7 4z"/></svg>'
+            + '<span class="dist">'+fmtDist(p.d)+'</span>'
+          : '')
+      + '</span></button>'
+    ).join('');
+  }
+
+  Object.values(markers).forEach(m => map.removeLayer(m));
+  markers = {};
+  live.filter(raw => hit(raw, view(raw))).forEach(p => {
+    markers[p.id] = L.marker([p.lat, p.lng],
+      { icon: pinIcon(p.id === activeId, p.discovered) })
+      .addTo(map).on('click', () => openDetail(p.id));
+  });
+}
+
+listEl.addEventListener('click', e => {
+  const card = e.target.closest('.card');
+  if(card) openDetail(card.dataset.id);
+});
+
+/* ---------- detail ---------- */
+function fillDetail(id){
+  const raw = allPlaces().find(x => x.id === id);
+  if(!raw) return;
+  const p = view(raw);
+  $('dTitle').textContent = p.name;
+  $('dTag').textContent = p.tag || '';
+  $('dStory').textContent = p.story || '';
+  $('dCountry').textContent = p.country || '—';
+  $('dAuthor').textContent = p.author || T.anon;
+  $('dCoords').textContent = p.lat.toFixed(4) + ', ' + p.lng.toFixed(4);
+  $('dDist').textContent = me ? fmtDist(distanceKm(me.lat, me.lng, p.lat, p.lng)) : '—';
+  $('dOrigin').textContent = T.origin;
+  $('dOrigin').classList.toggle('hide', p.translated);
+  $('btnEditPlace').style.display = (isAdmin && !raw.discovered) ? 'grid' : 'none';
+  const mine = reports.find(r => r.placeId === id && r.by === deviceId);
+  $('btnReport').querySelector('span').textContent = raw.discovered
+    ? T.writeAbout : mine ? T.yourReport : T.reportBtn;
+  const own = p.photos && p.photos.length ? p.photos : null;
+  gallery = own || p.wikiPhotos || [];
+  $('dGallery').innerHTML = gallery.length
+    ? gallery.map((src, i) => '<img src="'+src+'" alt="" data-i="'+i
+        + '" loading="lazy" onerror="this.remove()">').join('')
+    : '<span class="ph">'+contour(p.id+p.name, 270, 194)+'</span>';
+  $('dCredit').style.display = (!own && gallery.length) ? '' : 'none';
+  $('dCredit').textContent = gallery.length + ' photos · Wikipedia';
+  $('dOrigin').classList.toggle('hide', !raw.discovered);
+  if(raw.discovered) $('dOrigin').textContent = T.viaWiki;
+}
+async function openDetail(id){
+  activeId = id;
+  const p = allPlaces().find(x => x.id === id);
+  if(!p) return;
+  fillDetail(id);
+  map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 11), { duration:.9 });
+  openPanel('detail');
+  render();
+  if(p.discovered){
+    await loadSummary(p);
+    const list = await wikiPhotos(p);
+    if(list.length){ p.wikiPhotos = list; p.wikiPhoto = list[0]; }
+    if(activeId === id) fillDetail(id);
+  }
+}
+
+/* ---------- panels ---------- */
+const PANELS = ['detail','composer','report','admin','gate'];
+function openPanel(which){
+  PANELS.forEach(x => $(x).classList.toggle('on', x === which));
+  $('scrim').classList.add('on');
+  $('btnAdd').classList.add('hide');
+}
+function closePanels(){
+  $('scrim').classList.remove('on');
+  PANELS.forEach(x => $(x).classList.remove('on'));
+  if(!pickMode) $('btnAdd').classList.remove('hide');
+}
+$('scrim').addEventListener('click', closePanels);
+document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closePanels));
+
+/* ---------- geolocation ---------- */
+function setMe(lat, lng, acc, fly){
+  me = { lat, lng, acc };
+  $('lock').textContent = '●';
+  $('lock').classList.remove('off');
+  $('acc').textContent = acc ? '\u00b1' + Math.round(acc) + 'm' : T.posManual.toUpperCase();
+  $('coords').textContent = lat.toFixed(4) + ' / ' + lng.toFixed(4);
+
+  if(meMarker) map.removeLayer(meMarker);
+  meMarker = L.marker([lat, lng], { icon:meIcon, zIndexOffset:1000 }).addTo(map);
+
+  if(accCircle){ map.removeLayer(accCircle); accCircle = null; }
+  if(acc && acc > 80){                       // draw how uncertain the fix really is
+    accCircle = L.circle([lat, lng], { radius:acc, color:'#35f09a', weight:1,
+      opacity:.3, fillColor:'#35f09a', fillOpacity:.05 }).addTo(map);
+  }
+  if(fly) map.flyTo([lat, lng], acc > 5000 ? 9 : acc > 500 ? 12 : 14, { duration:1 });
+  render();
+  setSheet(true);
+}
+
+function stopWatch(){
+  if(watchId !== null){ navigator.geolocation.clearWatch(watchId); watchId = null; }
+}
+
+/* One reading is usually the coarse network guess. Keep listening and take each
+   better fix as it arrives, instead of settling for the first one. */
+function locate(){
+  if(!navigator.geolocation){ toast(T.tNoGeo); return; }
+  $('btnLocate').classList.add('on');
+  bestAcc = Infinity;
+  stopWatch();
+  let flown = false;
+  watchId = navigator.geolocation.watchPosition(pos => {
+    const acc = pos.coords.accuracy;
+    if(acc >= bestAcc) return;
+    bestAcc = acc;
+    setMe(pos.coords.latitude, pos.coords.longitude, acc, !flown);
+    flown = true;
+    if(acc <= 60) stopWatch();
+    else if(acc > 2000) toast(T.posApprox);
+  }, err => {
+    stopWatch();
+    $('btnLocate').classList.remove('on');
+    $('acc').textContent = err.code === 1 ? 'DENIED' : err.code === 2 ? 'UNAVAILABLE' : 'TIMEOUT';
+    toast(err.code === 1 ? T.tDenied : T.tNotFound);
+  }, { enableHighAccuracy:true, timeout:15000, maximumAge:0 });
+  setTimeout(stopWatch, 25000);
+}
+
+// hold the button to place yourself by hand
+let holdT = null, held = false;
+$('btnLocate').addEventListener('pointerdown', () => {
+  held = false;
+  holdT = setTimeout(() => { held = true; startPosPick(); }, 550);
+});
+['pointerup','pointerleave','pointercancel'].forEach(ev =>
+  $('btnLocate').addEventListener(ev, () => clearTimeout(holdT)));
+$('btnLocate').addEventListener('click', () => { if(!held) locate(); });
+$('btnSetPos').addEventListener('click', startPosPick);
+
+function startPosPick(){
+  stopWatch();
+  pickTarget = 'me';
+  pickMode = true;
+  closePanels();
+  $('pickbar').querySelector('b').textContent = T.setMyPos;
+  $('pickbar').querySelector('span').textContent = T.setMyPosBody;
+  $('crosshair').classList.add('on');
+  $('pickbar').classList.add('on');
+  $('btnAdd').classList.add('hide');
+  setSheet(false);
+}
+
+/* ---------- language switch ---------- */
+$('langs').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if(b) applyLang(b.dataset.lang);
+});
+
+/* ---------- toast ---------- */
+let toastT;
+function toast(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('on'), 2800);
+}
+
+/* ---------- sheet drag ---------- */
+const sheet = $('sheet'), grip = $('grip');
+let dragY = null, startOpen = false;
+grip.addEventListener('pointerdown', e => {
+  dragY = e.clientY; startOpen = sheet.classList.contains('open');
+  sheet.classList.add('dragging'); grip.setPointerCapture(e.pointerId);
+});
+grip.addEventListener('pointermove', e => {
+  if(dragY === null) return;
+  const peek = sheet.offsetHeight -
+    parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sheet-peek'));
+  const base = startOpen ? 0 : peek;
+  sheet.style.transform = 'translateY(' + Math.min(peek, Math.max(0, base + (e.clientY - dragY))) + 'px)';
+});
+grip.addEventListener('pointerup', e => {
+  if(dragY === null) return;
+  const moved = e.clientY - dragY;
+  sheet.classList.remove('dragging');
+  sheet.style.transform = '';
+  if(Math.abs(moved) < 6) setSheet(!sheet.classList.contains('open'));
+  else if(moved < -40) setSheet(true);
+  else if(moved > 40) setSheet(false);
+  dragY = null;
+});
+
+/* ---------- open / close + search ---------- */
+function setSheet(open){
+  sheet.classList.toggle('open', open);
+  sheet.classList.toggle('collapsed', !open);
+  $('btnOpenList').classList.toggle('on', !open);
+}
+$('btnOpenList').addEventListener('click', () => setSheet(true));
+$('btnToggle').addEventListener('click', () => setSheet(sheet.classList.contains('collapsed')));
+
+$('q').addEventListener('input', e => {
+  query = e.target.value;
+  $('qClear').classList.toggle('on', !!query);
+  render();
+});
+$('qClear').addEventListener('click', () => {
+  query = ''; $('q').value = '';
+  $('qClear').classList.remove('on');
+  render(); $('q').focus();
+});
+
+/* ---------- composer ---------- */
+function applyEditLabels(){
+  const h = $('composer').querySelector('h2');
+  if(editId){
+    h.textContent = T.editTitle;
+    $('btnSave').textContent = T.saveChanges;
+    $('btnDelete').textContent = delArmed ? T.confirmDel : T.deleteBtn;
+    $('btnDelete').style.display = '';
+    $('editNote').textContent = T.editingIn + ' ' + L10N[lang].label;
+    $('editNote').style.display = '';
+  } else {
+    h.textContent = T.composerTitle;
+    $('btnSave').textContent = T.publish;
+    $('btnDelete').style.display = 'none';
+    $('editNote').style.display = 'none';
+  }
+}
+
+function resetComposer(){
+  editId = null; delArmed = false;
+  draft = { lat:null, lng:null, src:null, photos:[] };
+  ['fName','fCountry','fTag','fStory','fAuthor'].forEach(id => $(id).value = '');
+  $('fLocLabel').textContent = T.noLoc;
+  $('fLocCoords').textContent = '--.---- / --.----';
+  renderShots(); applyEditLabels(); validate();
+}
+
+// admin edits the version in the language currently on screen
+function openEditor(id){
+  const raw = places.find(x => x.id === id);
+  if(!raw) return;
+  editId = id; delArmed = false;
+  const src = (raw.lang === lang) ? raw : ((raw.tr && raw.tr[lang]) || raw);
+  $('fName').value    = src.name || '';
+  $('fCountry').value = src.country || '';
+  $('fTag').value     = src.tag || '';
+  $('fStory').value   = src.story || '';
+  $('fAuthor').value  = src.author || '';
+  draft = { lat:raw.lat, lng:raw.lng, src:'map', photos:(raw.photos || []).slice() };
+  $('fLocLabel').textContent = T.pickedLoc;
+  $('fLocCoords').textContent = raw.lat.toFixed(4) + ' / ' + raw.lng.toFixed(4);
+  renderShots(); applyEditLabels(); validate();
+  openPanel('composer');
+}
+
+$('btnDelete').addEventListener('click', async () => {
+  if(!delArmed){ delArmed = true; applyEditLabels(); return; }
+  places = places.filter(x => x.id !== editId);
+  store.cache = places;
+  await store.save();
+  resetComposer(); closePanels(); render(); renderAdmin();
+  toast(T.tDeleted);
+});
+
+$('btnAdd').addEventListener('click', () => {
+  resetComposer();
+  if(me) setDraftLoc(me.lat, me.lng, 'me');
+  openPanel('composer');
+});
+function setDraftLoc(lat, lng, src){
+  draft.lat = lat; draft.lng = lng; draft.src = src;
+  $('fLocLabel').textContent = src === 'me' ? T.yourLoc : T.pickedLoc;
+  $('fLocCoords').textContent = lat.toFixed(4) + ' / ' + lng.toFixed(4);
+  validate();
+}
+$('btnPickOnMap').addEventListener('click', () => {
+  closePanels();
+  pickTarget = 'place';
+  pickMode = true;
+  $('pickbar').querySelector('b').textContent = T.pickTitle;
+  $('pickbar').querySelector('span').textContent = T.pickBody;
+  $('crosshair').classList.add('on');
+  $('pickbar').classList.add('on');
+  $('btnAdd').classList.add('hide');
+  setSheet(false);
+});
+$('btnConfirmPick').addEventListener('click', () => {
+  const c = map.getCenter();
+  pickMode = false;
+  $('crosshair').classList.remove('on');
+  $('pickbar').classList.remove('on');
+  if(pickTarget === 'me'){
+    $('btnLocate').classList.add('on');
+    setMe(c.lat, c.lng, 0, false);
+    $('btnAdd').classList.remove('hide');
+    return;
+  }
+  setDraftLoc(c.lat, c.lng, 'map');
+  openPanel('composer');
+});
+
+/* photos */
+$('drop').addEventListener('click', () => $('fFiles').click());
+$('fFiles').addEventListener('change', async e => {
+  for(const f of [...e.target.files].slice(0, 5 - draft.photos.length)){
+    try{ draft.photos.push(await shrink(f)); }catch(err){ toast(T.tBadPhoto); }
+  }
+  e.target.value = '';
+  renderShots();
+});
+function renderShots(){
+  $('shots').innerHTML = draft.photos.map((src,i) =>
+    '<div class="shot"><img src="'+src+'" alt="">'
+    + '<button data-i="'+i+'"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'
+  ).join('');
+}
+$('shots').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if(!b) return;
+  draft.photos.splice(+b.dataset.i, 1);
+  renderShots();
+});
+function shrink(file){
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 1100;
+        let w = img.width, h = img.height;
+        if(w > max || h > max){ const s = max/Math.max(w,h); w = Math.round(w*s); h = Math.round(h*s); }
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        res(c.toDataURL('image/jpeg', .72));
+      };
+      img.onerror = rej; img.src = fr.result;
+    };
+    fr.onerror = rej; fr.readAsDataURL(file);
+  });
+}
+
+/* save */
+['fName','fCountry','fStory'].forEach(id => $(id).addEventListener('input', validate));
+// one entry per spot: refuse a second place on top of an existing one
+function nearestClash(){
+  if(draft.lat === null) return null;
+  const lim = Math.max(0, +settings.minDist || 0) / 1000;
+  if(!lim) return null;
+  let best = null;
+  places.forEach(raw => {
+    if(raw.id === editId) return;
+    const d = distanceKm(draft.lat, draft.lng, raw.lat, raw.lng);
+    if(d < lim && (!best || d < best.d)) best = { raw, d };
+  });
+  return best;
+}
+function nameClash(){
+  const v = $('fName').value.trim().toLowerCase();
+  if(v.length < 3) return null;
+  return places.find(raw => {
+    if(raw.id === editId) return false;
+    const names = [raw.name].concat(raw.tr ? Object.values(raw.tr).map(t => t && t.name) : []);
+    return names.some(nm => nm && nm.toLowerCase() === v);
+  }) || null;
+}
+
+function validate(){
+  const miss = [];
+  if(draft.lat === null) miss.push(T.needLoc);
+  if(!$('fName').value.trim()) miss.push(T.needName);
+  if($('fStory').value.trim().length <= 24) miss.push(T.needStory);
+
+  const near = nearestClash();
+  const same = near ? null : nameClash();
+  const clash = near ? near.raw : same;
+
+  if(clash){
+    const nm = view(clash).name;
+    $('saveHint').innerHTML =
+      '<b>' + esc(near ? T.tooClose : T.sameName) + ' ' + esc(nm) + '</b>'
+      + (near ? ' — ' + esc(fmtDist(near.d)) : '')
+      + '<br>' + esc(T.mergeHint)
+      + '<br><button id="hintOpen" data-id="' + clash.id + '">' + esc(T.seeIt) + '</button>';
+    $('saveHint').classList.add('on');
+    $('btnSave').disabled = true;
+    $('locRow').classList.add('needed');
+    return;
+  }
+
+  $('btnSave').disabled = miss.length > 0;
+  $('saveHint').textContent = miss.length ? T.missing + ' ' + miss.join(' · ') : '';
+  $('saveHint').classList.toggle('on', miss.length > 0);
+  $('locRow').classList.toggle('needed', draft.lat === null);
+}
+
+$('saveHint').addEventListener('click', e => {
+  const b = e.target.closest('#hintOpen');
+  if(b) openDetail(b.dataset.id);
+});
+$('btnSave').addEventListener('click', async () => {
+  const fields = {
+    name:$('fName').value.trim(),
+    country:$('fCountry').value.trim() || '—',
+    tag:$('fTag').value.trim(),
+    story:$('fStory').value.trim(),
+    author:$('fAuthor').value.trim() || T.anon
+  };
+
+  if(editId){
+    const raw = places.find(x => x.id === editId);
+    if(raw.lang === lang) Object.assign(raw, fields);
+    else {
+      raw.tr = raw.tr || {};
+      raw.tr[lang] = Object.assign({}, raw.tr[lang] || {}, fields);
+    }
+    raw.lat = draft.lat; raw.lng = draft.lng; raw.photos = draft.photos.slice();
+    store.cache = places;
+    await store.save();
+    resetComposer(); closePanels(); render(); renderAdmin();
+    toast(T.tSaved);
+    return;
+  }
+
+  places.push(Object.assign({
+    id:'u' + Date.now(), lang, status:'pending', by:deviceId, at:Date.now(),
+    lat:draft.lat, lng:draft.lng, photos:draft.photos.slice()
+  }, fields));
+  store.cache = places;
+  await store.save();
+  resetComposer(); closePanels(); render(); renderAdmin();
+  toast(T.tPendingSent);
+});
+
+/* ============================================================
+   ADMIN — requests & reports
+   ============================================================ */
+function pendingList(){ return places.filter(p => p.status === 'pending'); }
+function openReports(){ return reports.filter(r => r.status === 'open'); }
+
+function updateBadges(){
+  const a = pendingList().length, b = openReports().length;
+  [['badgeReq',a],['badgeRep',b],['adminBadge',a+b]].forEach(([id,n]) => {
+    const el = $(id);
+    el.textContent = n;
+    el.classList.toggle('zero', n === 0);
+  });
+}
+
+function renderAdmin(){
+  updateBadges();
+  if(!isAdmin) return;
+
+  const pend = pendingList();
+  $('paneReq').innerHTML = pend.length ? pend.map(raw => {
+    const p = view(raw);
+    return '<div class="review">'
+      + '<div class="review-top"><span class="thumb">'
+      + (p.shot ? '<img src="'+p.shot+'" alt="">' : contour(p.id+p.name,54,54))
+      + '</span><div><h3>' + esc(p.name) + '</h3><p>'
+      + esc(p.country || '—') + ' · ' + esc(p.author || T.anon) + '</p></div></div>'
+      + '<p class="review-story">' + esc(p.story || '') + '</p>'
+      + '<p class="review-meta">' + p.lat.toFixed(4) + ', ' + p.lng.toFixed(4)
+      + ' · ' + (p.photos ? p.photos.length : 0) + ' 📷</p>'
+      + '<div class="actions">'
+      + '<button class="ok" data-approve="'+p.id+'">' + esc(T.approve) + '</button>'
+      + '<button class="no" data-reject="'+p.id+'">' + esc(T.reject) + '</button>'
+      + '</div></div>';
+  }).join('') : '<div class="empty">' + esc(T.noRequests) + '</div>';
+
+  const rs = reports.slice().sort((a,b) => (a.status === b.status ? b.at - a.at : a.status === 'open' ? -1 : 1));
+  $('paneRep').innerHTML = rs.length ? rs.map(r => {
+    const raw = places.find(x => x.id === r.placeId);
+    const nm = raw ? view(raw).name : '—';
+    const last = r.thread[r.thread.length - 1];
+    return '<button class="rcard" data-report="'+r.id+'">'
+      + '<h3>' + esc(nm) + '</h3>'
+      + '<p>' + esc(last ? last.text : '') + '</p>'
+      + '<span class="tagrow"><span class="pill' + (r.status === 'open' ? ' open' : '') + '">'
+      + esc(r.status === 'open' ? T.statusOpen : T.statusResolved) + '</span>'
+      + '<span class="pill">' + esc(T[r.reason] || '') + '</span>'
+      + '<span class="pill">' + r.thread.length + ' ✉</span></span></button>';
+  }).join('') : '<div class="empty">' + esc(T.noReports) + '</div>';
+
+  $('paneAll').innerHTML = places.length ? places.map(raw => {
+    const p = view(raw), st = raw.status || 'approved';
+    return '<button class="rcard" data-edit="'+raw.id+'">'
+      + '<h3>' + esc(p.name) + '</h3><p>' + esc(p.tag || p.story || '') + '</p>'
+      + '<span class="tagrow">'
+      + (st === 'approved' ? '' : '<span class="pill open">'
+          + esc(st === 'pending' ? T.pendingNote : T.reject) + '</span>')
+      + '<span class="pill">' + esc(p.country || '—') + '</span>'
+      + '<span class="pill">' + (raw.photos ? raw.photos.length : 0) + ' 📷</span>'
+      + '</span></button>';
+  }).join('') : '<div class="empty">' + esc(T.noPlaces) + '</div>';
+
+  renderSite();
+}
+
+function renderSite(){
+  if(!isAdmin || !$('paneSite')) return;
+  const base = L10N[lang], ov = overrides[lang] || {};
+  const keys = Object.keys(base).filter(k => k !== 'dir' && k !== 'label');
+  const f = strFilter.trim().toLowerCase();
+  const shown = keys.filter(k => !f || k.toLowerCase().includes(f)
+    || String(base[k]).toLowerCase().includes(f)
+    || String(ov[k] || '').toLowerCase().includes(f));
+
+  $('paneSite').innerHTML =
+    '<div class="sect"><h4>' + esc(T.siteBrand) + '</h4>'
+    + '<div class="row">'
+    + '<div class="strrow"><label>' + esc(T.siteBrand) + '</label>'
+    + '<input data-set="brand" value="' + esc(settings.brand) + '" placeholder="' + esc(T.brand) + '"></div>'
+    + '<div class="strrow"><label>' + esc(T.siteSub) + '</label>'
+    + '<input data-set="sub" value="' + esc(settings.sub) + '"></div>'
+    + '</div></div>'
+
+    + '<div class="sect"><h4>' + esc(T.siteMap) + '</h4>'
+    + '<p class="sub">' + settings.lat.toFixed(4) + ' / ' + settings.lng.toFixed(4)
+    + ' · zoom ' + settings.zoom + '</p>'
+    + '<button class="minibtn" id="btnUseView">' + esc(T.useCurrentView) + '</button></div>'
+
+    + '<div class="sect"><h4>' + esc(T.siteCode) + '</h4>'
+    + '<div class="strrow"><input data-set="code" value="' + esc(settings.code) + '"></div></div>'
+
+    + '<div class="sect"><h4>' + esc(T.baseLabel) + '</h4>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    + ['green','english','grey'].map(k =>
+        '<button class="minibtn" data-base="' + k + '"'
+        + (settings.basemap === k ? ' style="border-color:var(--green-dim)"' : '')
+        + '>' + esc(k === 'green' ? T.baseGreen : k === 'english' ? T.baseEnglish : T.baseGrey)
+        + '</button>').join('')
+    + '</div></div>'
+
+    + '<div class="sect"><h4>' + esc(T.minDistLabel) + '</h4>'
+    + '<div class="strrow"><input data-set="minDist" inputmode="numeric" value="'
+    + esc(settings.minDist) + '"></div></div>'
+
+    + '<div class="sect"><h4>' + esc(T.siteTexts) + '</h4>'
+    + '<p class="sub">' + esc(T.siteTextsHint) + '</p>'
+    + '<div class="strrow"><input id="strFilter" placeholder="' + esc(T.filterPh)
+    + '" value="' + esc(strFilter) + '"></div>'
+    + shown.map(k => {
+        const val = ov[k] !== undefined ? ov[k] : base[k];
+        const long = String(base[k]).length > 52;
+        return '<div class="strrow' + (ov[k] !== undefined ? ' dirty' : '') + '">'
+          + '<label>' + k + '</label>'
+          + (long
+              ? '<textarea data-str="' + k + '">' + esc(val) + '</textarea>'
+              : '<input data-str="' + k + '" value="' + esc(val) + '">')
+          + '</div>';
+      }).join('')
+    + '<button class="minibtn" id="btnResetStrings" style="margin-top:6px">'
+    + esc(T.resetText) + '</button></div>';
+}
+
+$('paneSite').addEventListener('input', e => {
+  const el = e.target;
+  if(el.id === 'strFilter'){
+    strFilter = el.value;
+    const pos = el.selectionStart;
+    renderSite();
+    const again = $('strFilter');
+    if(again){ again.focus(); again.setSelectionRange(pos, pos); }
+    return;
+  }
+  if(el.dataset.set){
+    const k = el.dataset.set;
+    settings[k] = k === 'minDist' ? (parseInt(el.value, 10) || 0)
+                : k === 'code' ? el.value.trim() : el.value;
+    if(k === 'brand' || k === 'sub'){
+      $('brandName').textContent = settings.brand || T.brand;
+      $('brandSub').textContent = settings.sub;
+    }
+    saveSite();
+    return;
+  }
+  if(el.dataset.str){
+    const k = el.dataset.str;
+    overrides[lang] = overrides[lang] || {};
+    if(el.value === L10N[lang][k]) delete overrides[lang][k];
+    else overrides[lang][k] = el.value;
+    T = Object.assign({}, L10N[lang], overrides[lang] || {});
+    el.closest('.strrow').classList.toggle('dirty', overrides[lang][k] !== undefined);
+    saveSite();
+  }
+});
+
+$('paneSite').addEventListener('click', async e => {
+  const b = e.target.closest('[data-base]');
+  if(b){
+    settings.basemap = b.dataset.base;
+    tileFails = 0;
+    setBasemap(settings.basemap);
+    saveSite(); renderSite();
+    return;
+  }
+  if(e.target.id === 'btnUseView'){
+    const c = map.getCenter();
+    settings.lat = c.lat; settings.lng = c.lng; settings.zoom = map.getZoom();
+    saveSite(); renderSite(); toast(T.tSettingsSaved);
+  }
+  if(e.target.id === 'btnResetStrings'){
+    delete overrides[lang];
+    saveSite();
+    applyLang(lang);
+    toast(T.tSettingsSaved);
+  }
+});
+
+$('paneAll').addEventListener('click', e => {
+  const b = e.target.closest('[data-edit]');
+  if(b) openEditor(b.dataset.edit);
+});
+
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if(!b) return;
+  adminTab = b.dataset.tab;
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+  $('paneReq').classList.toggle('on', adminTab === 'req');
+  $('paneRep').classList.toggle('on', adminTab === 'rep');
+  $('paneAll').classList.toggle('on', adminTab === 'all');
+  $('paneSite').classList.toggle('on', adminTab === 'site');
+});
+
+$('paneReq').addEventListener('click', async e => {
+  const ok = e.target.closest('[data-approve]'), no = e.target.closest('[data-reject]');
+  const id = ok ? ok.dataset.approve : no ? no.dataset.reject : null;
+  if(!id) return;
+  const p = places.find(x => x.id === id);
+  p.status = ok ? 'approved' : 'rejected';
+  store.cache = places;
+  await store.save();
+  render(); renderAdmin();
+  toast(ok ? T.tApproved : T.tRejected);
+});
+
+$('paneRep').addEventListener('click', e => {
+  const b = e.target.closest('[data-report]');
+  if(b) openThread(b.dataset.report, true);
+});
+
+$('btnAdmin').addEventListener('click', () => { renderAdmin(); openPanel('admin'); });
+
+$('btnGate').addEventListener('click', async () => {
+  if($('gCode').value.trim() !== (settings.code || DEFAULT_CODE)){ toast(T.tBadCode); return; }
+  isAdmin = true;
+  $('gCode').value = '';
+  $('btnAdmin').classList.add('on');
+  renderAdmin();
+  openPanel('admin');
+});
+$('gCode').addEventListener('keydown', e => { if(e.key === 'Enter') $('btnGate').click(); });
+
+/* ============================================================
+   REPORTS — user side
+   ============================================================ */
+function renderReasons(){
+  $('reasons').innerHTML = REASONS.map(k =>
+    '<button data-reason="'+k+'"' + (reportCtx.reason === k ? ' class="on"' : '') + '>'
+    + esc(T[k]) + '</button>').join('');
+}
+$('reasons').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if(!b) return;
+  reportCtx.reason = b.dataset.reason;
+  renderReasons();
+  $('btnSendReport').disabled = false;
+});
+
+$('dGallery').addEventListener('click', e => {
+  const img = e.target.closest('img');
+  if(!img || !gallery.length) return;
+  lbIndex = +img.dataset.i || 0;
+  showLightbox();
+});
+function showLightbox(){
+  $('lbImg').src = gallery[lbIndex];
+  $('lbCount').textContent = (lbIndex + 1) + ' / ' + gallery.length;
+  const solo = gallery.length < 2;
+  $('lbPrev').classList.toggle('off', solo);
+  $('lbNext').classList.toggle('off', solo);
+  $('lightbox').classList.add('on');
+  if(!solo){                                   // warm up the neighbours
+    [1, -1].forEach(d => {
+      const i = (lbIndex + d + gallery.length) % gallery.length;
+      new Image().src = gallery[i];
+    });
+  }
+}
+function step(d){
+  if(gallery.length < 2) return;
+  lbIndex = (lbIndex + d + gallery.length) % gallery.length;
+  showLightbox();
+}
+$('lbPrev').addEventListener('click', e => { e.stopPropagation(); step(-1); });
+$('lbNext').addEventListener('click', e => { e.stopPropagation(); step(1); });
+
+$('lightbox').addEventListener('click', e => {
+  if(e.target.id === 'lbImg'){ step(1); return; }
+  if(e.target.closest('.lb-nav')) return;
+  $('lightbox').classList.remove('on');
+});
+
+let swipeX = null;
+$('lbImg').addEventListener('touchstart', e => { swipeX = e.touches[0].clientX; }, {passive:true});
+$('lbImg').addEventListener('touchend', e => {
+  if(swipeX === null) return;
+  const dx = e.changedTouches[0].clientX - swipeX;
+  swipeX = null;
+  if(Math.abs(dx) > 45) step(dx < 0 ? 1 : -1);
+}, {passive:true});
+
+document.addEventListener('keydown', e => {
+  if(!$('lightbox').classList.contains('on')) return;
+  if(e.key === 'Escape') $('lightbox').classList.remove('on');
+  if(e.key === 'ArrowLeft')  step(-1);
+  if(e.key === 'ArrowRight') step(1);
+});
+
+$('btnEditPlace').addEventListener('click', () => { if(activeId) openEditor(activeId); });
+
+$('btnReport').addEventListener('click', () => {
+  const raw = allPlaces().find(x => x.id === activeId);
+  if(raw && raw.discovered){
+    resetComposer();
+    $('fName').value = raw.name;
+    $('fCountry').value = raw.country || '';
+    setDraftLoc(raw.lat, raw.lng, 'map');
+    openPanel('composer');
+    return;
+  }
+  const mine = reports.find(r => r.placeId === activeId && r.by === deviceId);
+  if(mine) openThread(mine.id, false);
+  else {
+    reportCtx = { placeId:activeId, reportId:null, asAdmin:false, reason:null };
+    $('reportHead').textContent = T.reportTitle;
+    $('reportNew').style.display = '';
+    $('reportThread').style.display = 'none';
+    $('rMsg').value = '';
+    $('btnSendReport').disabled = true;
+    renderReasons();
+    openPanel('report');
+  }
+});
+
+$('btnSendReport').addEventListener('click', async () => {
+  const r = {
+    id:'r' + Date.now(), placeId:reportCtx.placeId, by:deviceId,
+    reason:reportCtx.reason, status:'open', at:Date.now(),
+    thread:[{ from:'user', text:$('rMsg').value.trim() || T[reportCtx.reason], at:Date.now() }]
+  };
+  reports.push(r);
+  rstore.cache = reports;
+  await rstore.save();
+  renderAdmin();
+  closePanels();
+  toast(T.tReportSent);
+});
+
+function openThread(reportId, asAdmin){
+  const r = reports.find(x => x.id === reportId);
+  if(!r) return;
+  reportCtx = { placeId:r.placeId, reportId, asAdmin, reason:r.reason };
+  $('reportNew').style.display = 'none';
+  $('reportThread').style.display = '';
+  renderThread();
+  openPanel('report');
+}
+
+function renderThread(){
+  const r = reports.find(x => x.id === reportCtx.reportId);
+  if(!r) return;
+  const raw = places.find(x => x.id === r.placeId);
+  $('reportHead').textContent = raw ? view(raw).name : T.reportTitle;
+  $('rThreadTag').textContent = (T[r.reason] || '') + ' · '
+    + (r.status === 'open' ? T.statusOpen : T.statusResolved);
+  $('rThread').innerHTML = r.thread.map(m =>
+    '<div class="bub ' + m.from + '">' + esc(m.text)
+    + '<time>' + (m.from === 'admin' ? esc(T.adminTag) : esc(T.youTag)) + ' · '
+    + new Date(m.at).toLocaleDateString() + '</time></div>').join('')
+    + (reportCtx.asAdmin && r.status === 'open'
+        ? '<button class="no" style="margin-top:8px;padding:11px;border-radius:12px;font-size:12.5px;font-weight:700" id="btnResolve">'
+          + esc(T.resolve) + '</button>' : '');
+  $('rReply').disabled = r.status !== 'open';
+  const rb = $('btnResolve');
+  if(rb) rb.addEventListener('click', async () => {
+    r.status = 'resolved';
+    rstore.cache = reports;
+    await rstore.save();
+    renderThread(); renderAdmin();
+  });
+}
+
+$('rReply').addEventListener('input', e => { $('btnReply').disabled = !e.target.value.trim(); });
+$('rReply').addEventListener('keydown', e => { if(e.key === 'Enter') $('btnReply').click(); });
+$('btnReply').addEventListener('click', async () => {
+  const txt = $('rReply').value.trim();
+  if(!txt) return;
+  const r = reports.find(x => x.id === reportCtx.reportId);
+  r.thread.push({ from: reportCtx.asAdmin ? 'admin' : 'user', text:txt, at:Date.now() });
+  if(reportCtx.asAdmin) r.status = 'open';
+  rstore.cache = reports;
+  await rstore.save();
+  $('rReply').value = '';
+  $('btnReply').disabled = true;
+  renderThread(); renderAdmin();
+});
+
+/* ---------- boot ---------- */
+(async () => {
+  await initDevice();
+  try{ const v = await db.get('masalek:settings'); if(v) Object.assign(settings, JSON.parse(v)); }catch(e){}
+  try{ const v = await db.get('masalek:i18n'); if(v) overrides = JSON.parse(v) || {}; }catch(e){}
+  map.setView([settings.lat, settings.lng], settings.zoom);
+  setBasemap(settings.basemap || 'green');
+  places = mergeFR(await store.load());
+  store.cache = places;
+  store.save();
+  reports = await rstore.load();
+  let saved = await db.get('masalek:lang');
+  if(!saved){
+    const n = (navigator.language || 'ar').slice(0,2);
+    saved = L10N[n] ? n : 'ar';
+  }
+  applyLang(saved);
+  updateBadges();
+  const checkHash = () => {
+    if(location.hash.toLowerCase() === '#admin'){
+      if(isAdmin){ renderAdmin(); openPanel('admin'); }
+      else openPanel('gate');
+    }
+  };
+  window.addEventListener('hashchange', checkHash);
+  checkHash();
+  hydratePhotos();
+  scheduleDiscover();
+  setTimeout(() => setSheet(true), 500);
+  if(navigator.permissions){
+    try{
+      const st = await navigator.permissions.query({ name:'geolocation' });
+      if(st.state === 'granted') locate();
+    }catch(e){}
+  }
+})();
+</script>
