@@ -1534,11 +1534,14 @@ async function candidates(raw){
 
 async function wikiPhotos(raw){
   if(photoCache[raw.id]) return photoCache[raw.id];
-  photoCache[raw.id] = [];
   if(!raw.wiki) return [];
-  const cands = (await candidates(raw)).slice(0, 14);
-  const ok = await Promise.all(cands.map(loadable));
-  photoCache[raw.id] = cands.filter((_, i) => ok[i]).slice(0, 5);
+  // cache the in-flight promise, not [] — an empty array is truthy, so a second
+  // concurrent call used to give up while the first was still fetching
+  photoCache[raw.id] = (async () => {
+    const cands = (await candidates(raw)).slice(0, 14);
+    const ok = await Promise.all(cands.map(loadable));
+    return cands.filter((_, i) => ok[i]).slice(0, 5);
+  })();
   return photoCache[raw.id];
 }
 
@@ -1598,7 +1601,50 @@ async function discover(){
         lat:it.lat, lng:it.lon
       }));
     render();
+    enrichFound(found);
   }catch(e){}
+}
+
+// One batched request per 50 places: thumbnail + short description for every
+// discovered place at once, so the cards are not blank until you open them
+// individually. hydratePhotos() only ever covered the curated `places` array.
+// "Church building in Ferrara, Italy" -> Italy. A country is one to three
+// words, so a long tail ("located in the Emilia-Romagna region") is not one.
+function countryFrom(desc){
+  if(!desc || !desc.includes(',')) return '';
+  const tail = desc.split(',').pop().trim();
+  return (tail && tail.split(/\s+/).length <= 3) ? tail : '';
+}
+
+async function enrichFound(list){
+  for(let i = 0; i < list.length; i += 50){
+    const chunk = list.slice(i, i + 50);
+    if(!chunk.length) return;
+    try{
+      const r = await fetch('https://' + lang + '.wikipedia.org/w/api.php'
+        + '?action=query&format=json&origin=*&prop=pageimages|description'
+        + '&piprop=thumbnail&pithumbsize=400&pilimit=50&titles='
+        + encodeURIComponent(chunk.map(p => p.wiki).join('|')));
+      const j = await r.json();
+      const by = {};
+      Object.values((j.query && j.query.pages) || {}).forEach(pg => { by[pg.title] = pg; });
+      let any = false;
+      chunk.forEach(p => {
+        const pg = by[p.wiki];
+        if(!pg) return;
+        if(!p.wikiPhoto && pg.thumbnail && pg.thumbnail.source){
+          p.wikiPhoto = pg.thumbnail.source; any = true;
+        }
+        if(!p.tag && pg.description){
+          p.tag = pg.description;
+          const c = countryFrom(pg.description);
+          if(c) p.country = c;
+          any = true;
+        }
+      });
+      if(any && found === list) render();
+    }catch(e){}
+  }
 }
 function scheduleDiscover(){
   clearTimeout(discoverT);
@@ -1614,11 +1660,13 @@ async function loadSummary(raw){
     const r = await fetch('https://' + raw.host + '.wikipedia.org/api/rest_v1/page/summary/'
       + encodeURIComponent(raw.wiki.replace(/ /g, '_')));
     const j = await r.json();
-    const data = {
-      tag: j.description || '',
-      story: j.extract || '',
-      country: (j.description || '').split(',').pop().trim()
-    };
+    const desc = j.description || '';
+    const data = { story: j.extract || '' };
+    if(desc){
+      data.tag = desc;
+      const c = countryFrom(desc);
+      if(c) data.country = c;
+    }
     if(j.thumbnail && j.thumbnail.source) data.wikiPhoto = j.thumbnail.source;
     summaryCache[key] = data;
     Object.assign(raw, data);
@@ -1959,7 +2007,7 @@ function fillDetail(id){
   $('btnReport').querySelector('span').textContent = raw.discovered
     ? T.writeAbout : mine ? T.yourReport : T.reportBtn;
   const own = p.photos && p.photos.length ? p.photos : null;
-  gallery = own || p.wikiPhotos || [];
+  gallery = own || p.wikiPhotos || (p.wikiPhoto ? [p.wikiPhoto] : []);
   $('dGallery').innerHTML = gallery.length
     ? gallery.map((src, i) => '<img src="'+src+'" alt="" data-i="'+i
         + '" loading="lazy" onerror="this.remove()">').join('')
